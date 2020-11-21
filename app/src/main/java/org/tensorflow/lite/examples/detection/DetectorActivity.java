@@ -222,7 +222,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                     float p = result.getLocation().right - result.getLocation().left;
                                     float d = (float) ((6.5 * 263.621) / p);
                                     soundAlert(result, d);
-//                                    Log.d("pttt", "distance: " + d + " center : " + result.getLocation().centerX());
+//                                    Log.d("pttt", "distance: "  + d + " center : " + result.getLocation().centerX());
 //                                    Log.d("pttt", "name: " + result.getTitle());
 //                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
 
