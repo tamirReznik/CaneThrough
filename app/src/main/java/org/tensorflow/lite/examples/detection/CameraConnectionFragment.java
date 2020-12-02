@@ -208,7 +208,7 @@ public class CameraConnectionFragment extends Fragment {
    */
   protected static Size chooseOptimalSize(final Size[] choices, final int width, final int height) {
     final int minSize = Math.max(Math.min(width, height), MINIMUM_PREVIEW_SIZE);
-    final Size desiredSize = new Size(width, height);
+    final Size desiredSize = new Size(1920, 1080);
 
     // Collect the supported resolutions that are at least as big as the preview Surface
     boolean exactSizeFound = false;

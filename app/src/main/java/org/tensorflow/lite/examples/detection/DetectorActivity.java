@@ -211,22 +211,23 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 break;
                         }
 
-                        final List<Detector.Recognition> mappedRecognitions =
-                                new ArrayList<Detector.Recognition>();
+                        final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
 
                         for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
-                                canvas.drawRect(location, paint);
+
                                 if (result.getTitle().equals("mouse")) {
-                                    float p = result.getLocation().right - result.getLocation().left;
-                                    float d = (float) ((6.5 * 263.621) / p);
-                                    soundAlert(result, d);
+                                    canvas.drawRect(location, paint);
+//                                    float p = result.getLocation().right - result.getLocation().left;
+//                                    float d = (float) ((6.5 * 263.621) / p);
+                                    my_distance = getDistance(result);
+                                    soundAlert(result, my_distance);
 //                                    Log.d("pttt", "distance: "  + d + " center : " + result.getLocation().centerX());
 //                                    Log.d("pttt", "name: " + result.getTitle());
 //                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
 
-                                    my_distance = d;
+//                                    my_distance = d;
 
                                 }
 
@@ -253,6 +254,12 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 });
                     }
                 });
+    }
+
+    public float getDistance(Detector.Recognition result){
+        float p = result.getLocation().right - result.getLocation().left;
+        float d = (float) ((6.5 * 263.621) / p);
+        return d;
     }
 
     @Override
@@ -305,7 +312,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
     void soundAlert(Detector.Recognition result, float d) {
         if (!mediaPlayer.isPlaying()) {
-            mediaPlayer.setVolume((8.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (8.0f / d) * (result.getLocation().centerX() / 300.0f));
+            mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
             mediaPlayer.start();
         }
     }

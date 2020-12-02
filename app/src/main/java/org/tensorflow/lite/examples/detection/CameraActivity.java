@@ -107,6 +107,7 @@ public abstract class CameraActivity extends AppCompatActivity
         super.onCreate(null);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+
         setContentView(R.layout.tfe_od_activity_camera);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -213,7 +214,7 @@ public abstract class CameraActivity extends AppCompatActivity
                 previewHeight = previewSize.height;
                 previewWidth = previewSize.width;
                 rgbBytes = new int[previewWidth * previewHeight];
-                onPreviewSizeChosen(new Size(previewSize.width, previewSize.height), 90);
+                onPreviewSizeChosen(new Size(previewSize.width, previewSize.height), 0);
             }
         } catch (final Exception e) {
             LOGGER.e(e, "Exception!");
