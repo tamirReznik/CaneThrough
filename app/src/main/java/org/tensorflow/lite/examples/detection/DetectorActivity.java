@@ -29,6 +29,7 @@ import android.media.AudioAttributes;
 import android.media.ImageReader.OnImageAvailableListener;
 import android.media.MediaPlayer;
 import android.media.SoundPool;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -38,9 +39,13 @@ import android.util.Size;
 import android.util.TypedValue;
 import android.widget.Toast;
 
+import androidx.annotation.RequiresApi;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.PriorityQueue;
 
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
@@ -189,6 +194,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
         runInBackground(
                 new Runnable() {
+                    @RequiresApi(api = Build.VERSION_CODES.N)
                     @Override
                     public void run() {
 
@@ -212,8 +218,21 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         }
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
-
-                        for (final Detector.Recognition result : results) {
+                        mappedRecognitions.sort(new Comparator<Detector.Recognition>() {
+                            @Override
+                            public int compare(Detector.Recognition o1, Detector.Recognition o2) {
+                                float result = o1.getConfidence() - o2.getConfidence();
+                                if (result == 0)
+                                    return 0;
+                                else return result < 0 ? 1 : -1;
+                            }
+                        });
+                        PriorityQueue<Detector.Recognition> priorityQueue = new PriorityQueue<>(results.subList(0, 3));
+                        // Detector.Recognition result;
+//                        for (final Detector.Recognition result : results) {
+                        for (final Detector.Recognition result : priorityQueue) {
+                            //result = priorityQueue.poll();
+                            assert result != null;
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
 
@@ -237,7 +256,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 mappedRecognitions.add(result);
                             }
                         }
-
+//                        priorityQueue = null;
+//                        SystemClock.sleep(1500);
                         tracker.trackResults(mappedRecognitions, currTimestamp);
                         trackingOverlay.postInvalidate();
 
@@ -256,9 +276,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 });
     }
 
-    public float getDistance(Detector.Recognition result){
+    public float getDistance(Detector.Recognition result) {
         float p = result.getLocation().right - result.getLocation().left;
-        float d = (float) ((6.5 * 263.621) / p);
+        float d = (float) ((6.5 * 263.621) / (2 * p));
         return d;
     }
 
