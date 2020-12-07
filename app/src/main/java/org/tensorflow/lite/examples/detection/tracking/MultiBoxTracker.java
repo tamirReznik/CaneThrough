@@ -39,10 +39,13 @@ import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
 import org.tensorflow.lite.examples.detection.tflite.Detector.Recognition;
 
+
+
 /**
  * A tracker that handles non-max suppression and matches existing objects to new detections.
  */
 public class MultiBoxTracker {
+
     private static final float TEXT_SIZE_DIP = 18;
     private static final float MIN_SIZE = 16.0f;
     private static final int[] COLORS = {
@@ -74,7 +77,24 @@ public class MultiBoxTracker {
     private int frameHeight;
     private int sensorOrientation;
 
+    private static float dis_person = 0.0f;
+    private  static float dis_mouse;
+    private static Distance_CallBack distance_callBack = new Distance_CallBack() {
+
+        @Override
+        public void person(final float distance) {
+            dis_person = distance;
+        }
+
+        @Override
+        public void mouse(float distance) {
+            dis_mouse = distance;
+        }
+    };
+
     public MultiBoxTracker(final Context context) {
+
+        DetectorActivity.setDistanceCallBack(distance_callBack);
         for (final int color : COLORS) {
             availableColors.add(color);
         }
@@ -153,7 +173,9 @@ public class MultiBoxTracker {
             String confidence = String.format(Locale.getDefault(), "%.2f", (100 * recognition.detectionConfidence));
             String distance = "";
             if (title.equals("mouse"))
-                distance = String.format(Locale.getDefault(), "%.2f cm", DetectorActivity.my_distance);
+                distance = String.format(Locale.getDefault(), "%.2f cm", dis_mouse);
+            else if (title.equals("person"))
+                distance = String.format(Locale.getDefault(), "%.2f cm", dis_person);
 
 
             final String labelString =

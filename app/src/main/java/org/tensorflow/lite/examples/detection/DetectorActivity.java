@@ -44,7 +44,9 @@ import androidx.annotation.RequiresApi;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
@@ -54,6 +56,7 @@ import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
+import org.tensorflow.lite.examples.detection.tracking.Distance_CallBack;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
 
 /**
@@ -97,6 +100,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     private BorderedText borderedText;
 
     public static float my_distance;
+
+    public static Map<String, Float> my_distances = new HashMap<>();
+
+    static Distance_CallBack distanceCallBack;
 
 
     @Override
@@ -164,6 +171,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
         tracker.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
     }
+
+
 
     @Override
     protected void processImage() {
@@ -235,19 +244,28 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                             assert result != null;
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
-
+                                canvas.drawRect(location, paint);
                                 if (result.getTitle().equals("mouse")) {
-                                    canvas.drawRect(location, paint);
+
 //                                    float p = result.getLocation().right - result.getLocation().left;
 //                                    float d = (float) ((6.5 * 263.621) / p);
-                                    my_distance = getDistance(result);
-                                    soundAlert(result, my_distance);
+                                    float mouseDistance = getDistance(result);
+                                    distanceCallBack.mouse(mouseDistance);
+                                    //my_distances.put("mouse",mouseDistance);
+                                    //my_distance = getDistance(result);
+                                    soundAlert(result, mouseDistance);
 //                                    Log.d("pttt", "distance: "  + d + " center : " + result.getLocation().centerX());
 //                                    Log.d("pttt", "name: " + result.getTitle());
 //                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
 
 //                                    my_distance = d;
 
+                                }else if(result.getTitle().equals("person")){
+                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
+                                    float personDistance = getDistance(result);
+                                    distanceCallBack.person(personDistance);
+                                    //my_distances.put("person",personDistance);
+                                    soundAlert(result, personDistance);
                                 }
 
                                 cropToFrameTransform.mapRect(location);
@@ -277,9 +295,12 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     }
 
     public float getDistance(Detector.Recognition result) {
-        float p = result.getLocation().right - result.getLocation().left;
-        float d = (float) ((6.5 * 263.621) / (2 * p));
-        return d;
+        float pixels = result.getLocation().right - result.getLocation().left;
+        String label = result.getTitle();
+        return calculateDistance(label, pixels);
+    }
+    private float calculateDistance(String label, float pixels){
+        return (Labels_info.label_val.get(label)[0]* Labels_info.label_val.get(label)[1]) / (2 * pixels);
     }
 
     @Override
@@ -335,5 +356,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
             mediaPlayer.start();
         }
+    }
+
+    public static void setDistanceCallBack(Distance_CallBack callBack){
+        distanceCallBack = callBack;
     }
 }
