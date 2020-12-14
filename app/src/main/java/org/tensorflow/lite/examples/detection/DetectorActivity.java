@@ -34,6 +34,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.util.Size;
 import android.util.TypedValue;
@@ -46,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 
@@ -105,6 +107,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
     static Distance_CallBack distanceCallBack;
 
+    TextToSpeech textToSpeech;
+
+    float personLastLocation = 0;
+    float mouseLastLocation = 0;
 
     @Override
     public void onPreviewSizeChosen(final Size size, final int rotation) {
@@ -170,6 +176,17 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 });
 
         tracker.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+
+
+        textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS){
+                    int lang = textToSpeech.setLanguage(Locale.ENGLISH);
+
+                }
+            }
+        });
     }
 
 
@@ -253,10 +270,13 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                     distanceCallBack.mouse(mouseDistance);
                                     //my_distances.put("mouse",mouseDistance);
                                     //my_distance = getDistance(result);
-                                    soundAlert(result, mouseDistance);
+                                    //soundAlert(result, mouseDistance);
+
+                                    if(Math.abs(mouseLastLocation - mouseDistance) > 100)
+                                        soundReport(result, mouseDistance);
 //                                    Log.d("pttt", "distance: "  + d + " center : " + result.getLocation().centerX());
 //                                    Log.d("pttt", "name: " + result.getTitle());
-//                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
+                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
 
 //                                    my_distance = d;
 
@@ -265,7 +285,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                     float personDistance = getDistance(result);
                                     distanceCallBack.person(personDistance);
                                     //my_distances.put("person",personDistance);
-                                    soundAlert(result, personDistance);
+                                    //soundAlert(result, personDistance);
+                                    if(Math.abs(personLastLocation - personDistance) > 100)
+                                        soundReport(result, personDistance);
                                 }
 
                                 cropToFrameTransform.mapRect(location);
@@ -356,6 +378,38 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
             mediaPlayer.start();
         }
+    }
+
+    void soundReport(Detector.Recognition result, float d){
+        personLastLocation = d;
+        mouseLastLocation = d;
+        String side[] = {"on the left","ahead","on the right"};
+        String mySide = "";
+        if(result.getLocation().left < 100 && result.getLocation().right <=150)
+            mySide = side[0];
+        else if(result.getLocation().right > 200 && result.getLocation().left >=150)
+            mySide = side[2];
+        else
+            mySide = side[1];
+
+        d = d / 100;
+        int dd = (int) d;
+        String dis = String.format(Locale.getDefault(), "%d meters", dd);
+        //final Handler h =new Handler();
+        String finalMySide = mySide;
+        //Runnable r = new Runnable() {
+
+            //public void run() {
+
+                if (!textToSpeech.isSpeaking()) {
+                    int speech = textToSpeech.speak(""+result.getTitle() +" " +dis + " " + finalMySide, TextToSpeech.QUEUE_FLUSH,null);
+                }
+
+              //  h.postDelayed(this, 5000);
+          //  }
+        //};
+
+       // h.postDelayed(r, 5000);
     }
 
     public static void setDistanceCallBack(Distance_CallBack callBack){
