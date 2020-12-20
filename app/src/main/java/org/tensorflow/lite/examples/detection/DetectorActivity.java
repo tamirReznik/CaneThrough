@@ -25,15 +25,9 @@ import android.graphics.Paint;
 import android.graphics.Paint.Style;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.media.AudioAttributes;
 import android.media.ImageReader.OnImageAvailableListener;
-import android.media.MediaPlayer;
-import android.media.SoundPool;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.SystemClock;
-import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 import android.util.Size;
@@ -50,7 +44,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.stream.Collectors;
 
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
+import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
+import org.tensorflow.lite.examples.detection.caneThroughManager.Utils;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
 import org.tensorflow.lite.examples.detection.env.BorderedText;
@@ -59,6 +57,7 @@ import org.tensorflow.lite.examples.detection.env.Logger;
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 import org.tensorflow.lite.examples.detection.tracking.Distance_CallBack;
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
 
 /**
@@ -181,14 +180,13 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
-                if (status == TextToSpeech.SUCCESS){
+                if (status == TextToSpeech.SUCCESS) {
                     int lang = textToSpeech.setLanguage(Locale.ENGLISH);
 
                 }
             }
         });
     }
-
 
 
     @Override
@@ -198,7 +196,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         ++timestamp;
         final long currTimestamp = timestamp;
         trackingOverlay.postInvalidate();
-
         // No mutex needed as this method is not reentrant.
         if (computingDetection) {
             readyForNextImage();
@@ -228,6 +225,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final long startTime = SystemClock.uptimeMillis();
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+                        if (ObjectsManager.getInstance() != null)
+                            ObjectsManager.getInstance().addObjects(results.subList(0, 5).stream().filter(res -> res.getConfidence() > 0.55).collect(Collectors.toList()));
 
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);
@@ -244,50 +243,40 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         }
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
-                        mappedRecognitions.sort(new Comparator<Detector.Recognition>() {
-                            @Override
-                            public int compare(Detector.Recognition o1, Detector.Recognition o2) {
-                                float result = o1.getConfidence() - o2.getConfidence();
-                                if (result == 0)
-                                    return 0;
-                                else return result < 0 ? 1 : -1;
-                            }
-                        });
-                        PriorityQueue<Detector.Recognition> priorityQueue = new PriorityQueue<>(results.subList(0, 3));
-                        // Detector.Recognition result;
-//                        for (final Detector.Recognition result : results) {
-                        for (final Detector.Recognition result : priorityQueue) {
-                            //result = priorityQueue.poll();
-                            assert result != null;
+
+                        for (int i = 0; i < results.size(); i++)
+                            Log.i("TAGtest", "run: " + results.get(i).getLocation().left + " right: " + results.get(i).getLocation().right + "\n");
+
+
+                        for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
                                 canvas.drawRect(location, paint);
-                                if (result.getTitle().equals("mouse")) {
+                                if (result.getTitle().equals(Labels_Keys.MOUSE)) {
 
-//                                    float p = result.getLocation().right - result.getLocation().left;
-//                                    float d = (float) ((6.5 * 263.621) / p);
+
+                                    float p = result.getLocation().right - result.getLocation().left;
+                                    float d = (float) ((6.5 * 263.621) / p);
                                     float mouseDistance = getDistance(result);
                                     distanceCallBack.mouse(mouseDistance);
-                                    //my_distances.put("mouse",mouseDistance);
-                                    //my_distance = getDistance(result);
-                                    //soundAlert(result, mouseDistance);
+                                    my_distances.put("mouse", mouseDistance);
+                                    my_distance = getDistance(result);
+//                                    soundAlert(result, mouseDistance);
 
-                                    if(Math.abs(mouseLastLocation - mouseDistance) > 100)
-                                        soundReport(result, mouseDistance);
-//                                    Log.d("pttt", "distance: "  + d + " center : " + result.getLocation().centerX());
-//                                    Log.d("pttt", "name: " + result.getTitle());
+                                    if (Math.abs(mouseLastLocation - mouseDistance) > 100) {
+                                        Utils.soundReport(result, mouseDistance);
+                                    }
                                     Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
 
-//                                    my_distance = d;
 
-                                }else if(result.getTitle().equals("person")){
+                                } else if (result.getTitle().equals(Labels_Keys.PERSON)) {
                                     Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
                                     float personDistance = getDistance(result);
                                     distanceCallBack.person(personDistance);
                                     //my_distances.put("person",personDistance);
                                     //soundAlert(result, personDistance);
-                                    if(Math.abs(personLastLocation - personDistance) > 100)
-                                        soundReport(result, personDistance);
+                                    if (Math.abs(personLastLocation - personDistance) > 100)
+                                        Utils.soundReport(result, personDistance);
                                 }
 
                                 cropToFrameTransform.mapRect(location);
@@ -296,8 +285,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 mappedRecognitions.add(result);
                             }
                         }
-//                        priorityQueue = null;
-//                        SystemClock.sleep(1500);
+
                         tracker.trackResults(mappedRecognitions, currTimestamp);
                         trackingOverlay.postInvalidate();
 
@@ -321,8 +309,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         String label = result.getTitle();
         return calculateDistance(label, pixels);
     }
-    private float calculateDistance(String label, float pixels){
-        return (Labels_info.label_val.get(label)[0]* Labels_info.label_val.get(label)[1]) / (2 * pixels);
+
+    private float calculateDistance(String label, float pixels) {
+        return (Labels_info.label_val.get(label)[0] * Labels_info.label_val.get(label)[1]) / (2 * pixels);
     }
 
     @Override
@@ -380,14 +369,14 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         }
     }
 
-    void soundReport(Detector.Recognition result, float d){
+    void soundReport(Detector.Recognition result, float d) {
         personLastLocation = d;
         mouseLastLocation = d;
-        String side[] = {"on the left","ahead","on the right"};
+        String side[] = {"on the left", "ahead", "on the right"};
         String mySide = "";
-        if(result.getLocation().left < 100 && result.getLocation().right <=150)
+        if (result.getLocation().left < 100 && result.getLocation().right <= 150)
             mySide = side[0];
-        else if(result.getLocation().right > 200 && result.getLocation().left >=150)
+        else if (result.getLocation().right > 200 && result.getLocation().left >= 150)
             mySide = side[2];
         else
             mySide = side[1];
@@ -399,20 +388,20 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         String finalMySide = mySide;
         //Runnable r = new Runnable() {
 
-            //public void run() {
+        //public void run() {
 
-                if (!textToSpeech.isSpeaking()) {
-                    int speech = textToSpeech.speak(""+result.getTitle() +" " +dis + " " + finalMySide, TextToSpeech.QUEUE_FLUSH,null);
-                }
+        if (!textToSpeech.isSpeaking()) {
+            int speech = textToSpeech.speak("" + result.getTitle() + " " + dis + " " + finalMySide, TextToSpeech.QUEUE_FLUSH, null);
+        }
 
-              //  h.postDelayed(this, 5000);
-          //  }
+        //  h.postDelayed(this, 5000);
+        //  }
         //};
 
-       // h.postDelayed(r, 5000);
+        // h.postDelayed(r, 5000);
     }
 
-    public static void setDistanceCallBack(Distance_CallBack callBack){
+    public static void setDistanceCallBack(Distance_CallBack callBack) {
         distanceCallBack = callBack;
     }
 }

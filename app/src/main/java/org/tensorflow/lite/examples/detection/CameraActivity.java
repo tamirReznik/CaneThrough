@@ -56,6 +56,8 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import java.nio.ByteBuffer;
 
+import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
+import org.tensorflow.lite.examples.detection.caneThroughManager.TTSManager;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
 
@@ -96,7 +98,8 @@ public abstract class CameraActivity extends AppCompatActivity
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
-
+        TTSManager.init(getApplicationContext());
+        ObjectsManager.init(getApplicationContext());
         mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.beep);
 //        mediaPlayer.setLooping(true);
         mediaPlayer.setVolume(0, 0);
