@@ -9,7 +9,7 @@ import java.util.Locale;
 public class Utils {
 
     public static void soundReport(Detector.Recognition result, float d) {
-        String side[] = {"on the left", "ahead", "on the right"};
+        String[] side = {"on the left", "ahead", "on the right"};
         String mySide = "";
         if (result.getLocation().left < 100 && result.getLocation().right <= 150)
             mySide = side[0];
@@ -28,7 +28,7 @@ public class Utils {
         //public void run() {
 
         if (!TTSManager.getInstance().isSpeaking()) {
-            TTSManager.getInstance().speak("" + result.getTitle() + " " + dis + " " + finalMySide, TextToSpeech.QUEUE_FLUSH);
+            TTSManager.getInstance().speak("" + result.getTitle() + " " + dis + " " + finalMySide);
         }
     }
 }

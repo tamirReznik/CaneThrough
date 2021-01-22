@@ -1,6 +1,7 @@
 package org.tensorflow.lite.examples.detection.caneThroughManager;
 
 public interface Labels_Keys {
+    String CANE_THROUGH_LOG = "CT_log";
     String PERSON = "person";
     String MOUSE = "mouse";
     String CHAIR = "chair";

@@ -41,6 +41,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
 
+import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.View;
@@ -55,7 +56,9 @@ import android.widget.Toast;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
 import org.tensorflow.lite.examples.detection.caneThroughManager.TTSManager;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
@@ -94,16 +97,16 @@ public abstract class CameraActivity extends AppCompatActivity
     private SwitchCompat apiSwitchCompat;
     private TextView threadsTextView;
 
-    MediaPlayer mediaPlayer;
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
-        TTSManager.init(getApplicationContext());
-        ObjectsManager.init(getApplicationContext());
-        mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.beep);
-//        mediaPlayer.setLooping(true);
-        mediaPlayer.setVolume(0, 0);
-        mediaPlayer.start();
+
+
+//        TTSManager.init(getApplicationContext());
+//        mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.beep);
+////        mediaPlayer.setLooping(true);
+//        mediaPlayer.setVolume(0, 0);
+//        mediaPlayer.start();
 
 
         LOGGER.d("onCreate " + this);
@@ -114,7 +117,10 @@ public abstract class CameraActivity extends AppCompatActivity
         setContentView(R.layout.tfe_od_activity_camera);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayShowTitleEnabled(false);
+        Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
+
+        //Todo - CaneThrough
+        getSupportActionBar().hide();
 
         if (hasPermission()) {
             setFragment();
@@ -413,6 +419,7 @@ public abstract class CameraActivity extends AppCompatActivity
         if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
             return requiredLevel == deviceLevel;
         }
+
         // deviceLevel is not LEGACY, can use numerical sort
         return requiredLevel <= deviceLevel;
     }
@@ -456,6 +463,9 @@ public abstract class CameraActivity extends AppCompatActivity
     protected void setFragment() {
         String cameraId = chooseCamera();
 
+        //CaneThrough - The reason of init here is that ObjectsManager use camera characteristic so it need the chosen camera id
+        ObjectsManager.init(getApplicationContext(), cameraId);
+
         Fragment fragment;
         if (useCamera2API) {
             CameraConnectionFragment camera2Fragment =
@@ -465,6 +475,7 @@ public abstract class CameraActivity extends AppCompatActivity
                                 public void onPreviewSizeChosen(final Size size, final int rotation) {
                                     previewHeight = size.getHeight();
                                     previewWidth = size.getWidth();
+                                    Log.i(Labels_Keys.CANE_THROUGH_LOG, "onPreviewSizeChosen: previewHeight "+previewHeight+" "+ previewWidth);
                                     CameraActivity.this.onPreviewSizeChosen(size, rotation);
                                 }
                             },

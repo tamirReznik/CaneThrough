@@ -145,7 +145,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
         previewWidth = size.getWidth();
         previewHeight = size.getHeight();
-
+        Log.i("size", "onPreviewSizeChosen: Height: " + previewHeight + "width " + previewWidth);
         sensorOrientation = rotation - getScreenOrientation();
         LOGGER.i("Camera orientation relative to screen canvas: %d", sensorOrientation);
 
@@ -225,6 +225,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final long startTime = SystemClock.uptimeMillis();
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+
+
                         if (ObjectsManager.getInstance() != null)
                             ObjectsManager.getInstance().addObjects(results.subList(0, 5).stream().filter(res -> res.getConfidence() > 0.55).collect(Collectors.toList()));
 
@@ -252,36 +254,37 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
                                 canvas.drawRect(location, paint);
-                                if (result.getTitle().equals(Labels_Keys.MOUSE)) {
-
-
-                                    float p = result.getLocation().right - result.getLocation().left;
-                                    float d = (float) ((6.5 * 263.621) / p);
-                                    float mouseDistance = getDistance(result);
-                                    distanceCallBack.mouse(mouseDistance);
-                                    my_distances.put("mouse", mouseDistance);
-                                    my_distance = getDistance(result);
-//                                    soundAlert(result, mouseDistance);
-
-                                    if (Math.abs(mouseLastLocation - mouseDistance) > 100) {
-                                        Utils.soundReport(result, mouseDistance);
-                                    }
-                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
-
-
-                                } else if (result.getTitle().equals(Labels_Keys.PERSON)) {
-                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
-                                    float personDistance = getDistance(result);
-                                    distanceCallBack.person(personDistance);
-                                    //my_distances.put("person",personDistance);
-                                    //soundAlert(result, personDistance);
-                                    if (Math.abs(personLastLocation - personDistance) > 100)
-                                        Utils.soundReport(result, personDistance);
-                                }
+//                                if (result.getTitle().equals(Labels_Keys.MOUSE)) {
+//
+//
+//                                    float p = result.getLocation().right - result.getLocation().left;
+//                                    float d = (float) ((6.5 * 263.621) / p);
+//                                    float mouseDistance = getDistance(result);
+//                                    distanceCallBack.mouse(mouseDistance);
+//                                    my_distances.put("mouse", mouseDistance);
+//                                    my_distance = getDistance(result);
+////                                    soundAlert(result, mouseDistance);
+//
+//                                    if (Math.abs(mouseLastLocation - mouseDistance) > 100) {
+//                                        Utils.soundReport(result, mouseDistance);
+//                                    }
+//                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
+//
+//
+//                                } else if (result.getTitle().equals(Labels_Keys.PERSON)) {
+//                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
+//                                    float personDistance = getDistance(result);
+//                                    distanceCallBack.person(personDistance);
+//                                    //my_distances.put("person",personDistance);
+//                                    //soundAlert(result, personDistance);
+//                                    if (Math.abs(personLastLocation - personDistance) > 100)
+//                                        Utils.soundReport(result, personDistance);
+//                                }
 
                                 cropToFrameTransform.mapRect(location);
-
+                                Log.i("size", "onPreviewSize beforeupdate : Height: " + (result.getLocation().top + result.getLocation().bottom) + "width " + (location.right - location.left));
                                 result.setLocation(location);
+                                Log.i("size", "onPreviewSizeChosen: Height: " + (-result.getLocation().top + result.getLocation().bottom) + "width " + (result.getLocation().right - result.getLocation().left));
                                 mappedRecognitions.add(result);
                             }
                         }
@@ -362,17 +365,17 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 });
     }
 
-    void soundAlert(Detector.Recognition result, float d) {
-        if (!mediaPlayer.isPlaying()) {
-            mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
-            mediaPlayer.start();
-        }
-    }
+//    void soundAlert(Detector.Recognition result, float d) {
+//        if (!mediaPlayer.isPlaying()) {
+//            mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
+//            mediaPlayer.start();
+//        }
+//    }
 
     void soundReport(Detector.Recognition result, float d) {
         personLastLocation = d;
         mouseLastLocation = d;
-        String side[] = {"on the left", "ahead", "on the right"};
+        String[] side = {"on the left", "ahead", "on the right"};
         String mySide = "";
         if (result.getLocation().left < 100 && result.getLocation().right <= 150)
             mySide = side[0];

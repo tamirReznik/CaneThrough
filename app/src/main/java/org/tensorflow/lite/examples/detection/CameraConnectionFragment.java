@@ -25,6 +25,7 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Configuration;
+import android.graphics.Camera;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
@@ -44,6 +45,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.text.TextUtils;
+import android.util.Log;
 import android.util.Size;
 import android.util.SparseIntArray;
 import android.view.LayoutInflater;
@@ -59,6 +61,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.customview.AutoFitTextureView;
 import org.tensorflow.lite.examples.detection.env.Logger;
 
@@ -66,10 +70,10 @@ import org.tensorflow.lite.examples.detection.env.Logger;
 public class CameraConnectionFragment extends Fragment {
   private static final Logger LOGGER = new Logger();
 
-  /**
-   * The camera preview size will be chosen to be the smallest frame by pixel size capable of
-   * containing a DESIRED_SIZE x DESIRED_SIZE square.
-   */
+//  /**
+//   * The camera preview size will be chosen to be the smallest frame by pixel size capable of
+//   * containing a DESIRED_SIZE x DESIRED_SIZE square.
+//   */
   private static final int MINIMUM_PREVIEW_SIZE = 320;
 
   /** Conversion from screen rotation to JPEG orientation. */
@@ -208,6 +212,7 @@ public class CameraConnectionFragment extends Fragment {
    */
   protected static Size chooseOptimalSize(final Size[] choices, final int width, final int height) {
     final int minSize = Math.max(Math.min(width, height), MINIMUM_PREVIEW_SIZE);
+    Log.i(Labels_Keys.CANE_THROUGH_LOG, "chooseOptimalSize: width: "+width+" height:"+height);
     final Size desiredSize = new Size(1920, 1080);
 
     // Collect the supported resolutions that are at least as big as the preview Surface
