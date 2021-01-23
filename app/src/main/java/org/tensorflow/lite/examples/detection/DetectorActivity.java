@@ -38,17 +38,14 @@ import androidx.annotation.RequiresApi;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
-import org.tensorflow.lite.examples.detection.caneThroughManager.Utils;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
 import org.tensorflow.lite.examples.detection.env.BorderedText;
@@ -57,8 +54,9 @@ import org.tensorflow.lite.examples.detection.env.Logger;
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 import org.tensorflow.lite.examples.detection.tracking.Distance_CallBack;
-import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
+
+import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.ObjectManager_SIZE;
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -228,7 +226,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
 
                         if (ObjectsManager.getInstance() != null)
-                            ObjectsManager.getInstance().addObjects(results.subList(0, 5).stream().filter(res -> res.getConfidence() > 0.55).collect(Collectors.toList()));
+                            ObjectsManager.getInstance().addObjects(results.subList(0, ObjectManager_SIZE).stream().filter(res -> res.getConfidence() > 0.65).collect(Collectors.toList()));
 
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);

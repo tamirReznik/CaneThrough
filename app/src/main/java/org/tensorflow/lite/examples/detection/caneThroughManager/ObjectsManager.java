@@ -12,20 +12,25 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.util.SizeF;
 
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-
+//TODO - prevent duplicates of objects in liveobjects
 public class ObjectsManager {
+
+    public static final int ObjectManager_SIZE = 5;
 
     enum Position {
         LEFT,
         CENTER,
-        RIGHT
+        RIGHT,
     }
 
     private Float focalLength;
@@ -37,8 +42,6 @@ public class ObjectsManager {
     private static ObjectsManager instance;
     private TTSManager textToSpeech;
     private ArrayList<Detector.Recognition> liveObjects;
-    private Position[] position;
-    private Float[] distance;
 
     public static ObjectsManager getInstance() {
         return instance;
@@ -52,15 +55,13 @@ public class ObjectsManager {
         }
     }
 
-    private ObjectsManager(Context _context, String cameraId) {
+    private ObjectsManager(Context context, String cameraId) {
 
         liveObjects = new ArrayList<>();
-        alerted = new boolean[5];
-        distance = new Float[5];
-        handler = new Handler();
-        position = new Position[5];
+        alerted = new boolean[ObjectManager_SIZE];
+        handler = new Handler(Looper.myLooper());
 
-        context = _context.getApplicationContext();
+        this.context = context.getApplicationContext();
 
         initVoiceAlerts();
 
@@ -103,33 +104,41 @@ public class ObjectsManager {
         focalLength = focalL[focalL.length - 1];
 
     }
-/**
- * @param realHeight - object height in mm
- * @param pixHeight  - object height in pixels
- * */
-    private Float distanceCalc(float realHeight, float pixHeight) {
-//        return distance in meter's
-        return (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) * 1000;
-    }
 
+    /**
+     * @param realHeight - object height in mm
+     * @param pixHeight  - object height in pixels
+     */
+    private int distanceCalc(float realHeight, float pixHeight) {
+//        return distance in meter's
+        float result = (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) / 1000;
+        Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight);
+        return (int) result;
+    }
 
     private void initAlertRunnable() {
         new Runnable() {
             @Override
             public void run() {
+
                 for (int i = 0; i < liveObjects.size(); i++) {
                     if (!alerted[i]) {
-                        Log.i("handlerTag", "run: " + liveObjects.get(i).toString());
+                        Detector.Recognition tmpObj = liveObjects.get(i);
+                        Log.i("handlerTag", "run: " + tmpObj.toString());
                         // position[0].name();
-                        textToSpeech.speak(liveObjects.get(i).getTitle());
+                        if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
+                            textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
+                                    tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
+                            Log.i("handlerTag", "run: " + tmpObj.getLocation().centerX() + " pos: " + getPos(tmpObj));
+                        }
                         alerted[i] = true;
                     }
                 }
-                handler.postDelayed(this, 3000);
+                handler.postDelayed(this, 4000);
             }
+
         }.run();
     }
-
 
     public synchronized void addObjects(List<Detector.Recognition> list) {
         Log.i("listSize", "addObjects: " + liveObjects.size());
@@ -139,52 +148,32 @@ public class ObjectsManager {
 
         if (liveObjects == null || liveObjects.size() == 0) {
             liveObjects = new ArrayList<>(list);
+            //  updateLiveObjPos();
             return;
         }
 
         if (liveObjects.size() < list.size()) {
             liveObjects.addAll(list.subList(0, list.size() - liveObjects.size()));
+            // updateLiveObjPos();
         }
 
-        boolean[] keepOld = new boolean[5];
-        boolean[] removeNew = new boolean[list.size()];
+        boolean[] keepOld = new boolean[ObjectManager_SIZE];
+        boolean[] addNew = new boolean[list.size()];
+        Arrays.fill(addNew,Boolean.TRUE);
         for (int i = 0; i < liveObjects.size(); i++) {
             for (int j = 0; j < list.size(); j++) {
                 Detector.Recognition tempObj = liveObjects.get(i);
-                if (tempObj.getTitle().equals(list.get(j).getTitle())) {
-                    //Object from left
-                    if (tempObj.getLocation().centerX() <= 80 && list.get(j).getLocation().centerX() <= 80) {
-                        // distance[i] = distanceCalc(Labels_info.label_val.get(liveObjects.get(i).getTitle())[0],tempObj.getLocation().height());
-                        keepOld[i] = true;
-                        removeNew[j] = true;
-                        position[i] = Position.LEFT;
-                        continue;
-                    }
-                    //Object in right
-                    if (tempObj.getLocation().centerX() >= 220 && list.get(j).getLocation().centerX() >= 220) {
-                        keepOld[i] = true;
-                        removeNew[j] = true;
-                        position[i] = Position.RIGHT;
-                        continue;
-                    }
-                    //Object from center
-                    if ((tempObj.getLocation().centerX() > 80 && tempObj.getLocation().centerX() < 220)
-                            && (list.get(j).getLocation().centerX() > 80 && list.get(j).getLocation().centerX() < 220)) {
-                        keepOld[i] = true;
-                        removeNew[j] = true;
-                        position[i] = Position.CENTER;
-
-                    }
-
+                if (tempObj.getTitle().equals(list.get(j).getTitle()) && getPos(tempObj).equals(getPos(list.get(j)))) {
+                    keepOld[i] = true;
+                    addNew[j] = false;
                 }
             }
-
         }
 
         for (int i = 0; i < liveObjects.size(); i++) {
             if (!keepOld[i]) {
-                for (int j = 0; j < removeNew.length; j++) {
-                    if (!removeNew[j]) {
+                for (int j = 0; j < addNew.length; j++) {
+                    if (addNew[j]) {
                         liveObjects.set(i, list.get(j));
                         alerted[i] = false;
                     }
@@ -195,4 +184,15 @@ public class ObjectsManager {
 
     }
 
+    private Position getPos(Detector.Recognition obj) {
+
+        if (obj.getLocation().centerX() <= 512) {
+            return Position.LEFT;
+        } else if (obj.getLocation().centerX() >= 1048) {
+            return Position.RIGHT;
+        } else {
+            return Position.CENTER;
+        }
+
+    }
 }
