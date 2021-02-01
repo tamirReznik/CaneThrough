@@ -224,7 +224,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-
+                        Log.i("pttt", "run: Thread id: "+Thread.currentThread().getId());
                         if (ObjectsManager.getInstance() != null)
                             ObjectsManager.getInstance().addObjects(results.subList(0, ObjectManager_SIZE).stream().filter(res -> res.getConfidence() > 0.65).collect(Collectors.toList()));
 

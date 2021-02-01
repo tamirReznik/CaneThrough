@@ -13,24 +13,36 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.SizeF;
 
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 //TODO - prevent duplicates of objects in liveobjects
+// fix concurrent data structures
 public class ObjectsManager {
 
-    public static final int ObjectManager_SIZE = 5;
+    public static final int ObjectManager_SIZE = 3;
+
 
     enum Position {
         LEFT,
         CENTER,
         RIGHT,
+        UNKNOWN
     }
 
     private Float focalLength;
@@ -38,26 +50,35 @@ public class ObjectsManager {
     private Float imageHeight, imageWidth;
     private final Handler handler;
     private final Context context;
-    private final boolean[] alerted;
+    private boolean[] alerted;
     private static ObjectsManager instance;
     private TTSManager textToSpeech;
-    private ArrayList<Detector.Recognition> liveObjects;
+    private Timer timer;
+//    private ArrayList<Detector.Recognition> liveObjects;
+
+
+    //    ArrayList<AtomicReference<MyDetectedObject>> atomicLiveObjects;
+    HashSet<MyAtomicRef> atomicLiveObjects;
+
 
     public static ObjectsManager getInstance() {
         return instance;
     }
 
 
-    public static void init(Context _context, String cameraId) {
+    public static void init(Context context, String cameraId) {
         Log.i("handlerTag", "run: ");
         if (instance == null) {
-            instance = new ObjectsManager(_context, cameraId);
+            instance = new ObjectsManager(context, cameraId);
         }
     }
 
     private ObjectsManager(Context context, String cameraId) {
 
-        liveObjects = new ArrayList<>();
+//        atomicLiveObjects = new ArrayList<>();
+
+        atomicLiveObjects = new HashSet<>();
+//        liveObjects = new ArrayList<>();
         alerted = new boolean[ObjectManager_SIZE];
         handler = new Handler(Looper.myLooper());
 
@@ -117,70 +138,147 @@ public class ObjectsManager {
     }
 
     private void initAlertRunnable() {
-        new Runnable() {
+
+
+        timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+//                Log.i("pttt", "run: TimerTask id: " + Thread.currentThread().getId());
 
-                for (int i = 0; i < liveObjects.size(); i++) {
-                    if (!alerted[i]) {
-                        Detector.Recognition tmpObj = liveObjects.get(i);
-                        Log.i("handlerTag", "run: " + tmpObj.toString());
+//                MyAtomicRef[] myDetectedObject = new MyAtomicRef[atomicLiveObjects.size()];
+                ArrayList<MyAtomicRef> myDetectedObject = new ArrayList<>(atomicLiveObjects);
+
+//                Log.i("pttt", "run: myDetectedObject size: "+myDetectedObject.size()+" atomicLiveObjects.size(): " + atomicLiveObjects.size());
+
+                MyDetectedObject myObj;
+//                int i = 0;
+                for (int i = 0; i < myDetectedObject.size(); i++) {
+
+                    if (myDetectedObject.get(i) == null) {
+                        Log.i("pttt", "run: object null");
+                        return;
+                    }
+                    myObj = myDetectedObject.get(i).get();
+                    if (!myObj.isAlerted()) {
+                        Detector.Recognition tmpObj = myObj.getLiveObject();
+                        Log.i("pttt", "run: alert : " + myObj.toString());
                         // position[0].name();
                         if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
                             textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
                                     tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
-                            Log.i("handlerTag", "run: " + tmpObj.getLocation().centerX() + " pos: " + getPos(tmpObj));
-                        }
-                        alerted[i] = true;
-                    }
-                }
-                handler.postDelayed(this, 4000);
-            }
 
-        }.run();
+                        }
+                        myObj.setAlerted(true);
+
+                    }
+                    myDetectedObject.set(i,new MyAtomicRef(myObj))  ;
+                }
+
+//                for (int i = 0; i < myDetectedObject.length; i++) {
+//                    myObj = myDetectedObject[i].get();
+//                    if (!myObj.isAlerted()) {
+//                        Detector.Recognition tmpObj = myObj.getLiveObject();
+//                        // position[0].name();
+//                        if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
+//                            textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
+//                                    tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
+//
+//                        }
+//                        myObj.setAlerted(true);
+//
+//                    }
+//                    myDetectedObject[i] = new MyAtomicRef(myObj);
+//                }
+                atomicLiveObjects.addAll(myDetectedObject);
+            }
+        }, 0, 3000);
+
+//      new Runnable() {
+//            @Override
+//            public void run() {
+//                Log.i("pttt", "run: alerts array:" + Arrays.toString(alerted));
+//                for (int i = 0; i < liveObjects.size(); i++) {
+//                    if (!alerted[i]) {
+//                        Detector.Recognition tmpObj = liveObjects.get(i);
+//                        Log.i("handlerTag", "run: " + tmpObj.toString());
+//                        // position[0].name();
+//                        if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
+//                            textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
+//                                    tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
+//                            Log.i("handlerTag", "run: " + tmpObj.getLocation().centerX() + " pos: " + getPos(tmpObj));
+//                        }
+//                        alerted[i] = true;
+//                    }
+//                }
+//                handler.postDelayed(this, 4000);
+//            }
+//
+//        }.run();
+
+
     }
 
-    public synchronized void addObjects(List<Detector.Recognition> list) {
-        Log.i("listSize", "addObjects: " + liveObjects.size());
+    public void addObjects(List<Detector.Recognition> list) {
+//        Log.i("listSize", "addObjects: " + liveObjects.size());
         if (list.isEmpty()) {
             return;
         }
 
-        if (liveObjects == null || liveObjects.size() == 0) {
-            liveObjects = new ArrayList<>(list);
+//        ArrayList<Detector.Recognition> liveObjects = atomicLiveObjects.stream().map(obj -> obj.get().getLiveObject()).collect(Collectors.toCollection(ArrayList::new));
+        ArrayList<MyDetectedObject> aliveObjects = atomicLiveObjects.stream()
+                .map(AtomicReference::get)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+//        Log.i("pttt", "addObjects: alive Size" + aliveObjects.size());
+
+        if (aliveObjects.size() == 0) {
+            aliveObjects.addAll(list.stream()
+                    .map(obj -> new MyDetectedObject(obj, false, getPos(obj)))
+                    .collect(Collectors.toList()));
             //  updateLiveObjPos();
-            return;
+//            return;
         }
 
-        if (liveObjects.size() < list.size()) {
-            liveObjects.addAll(list.subList(0, list.size() - liveObjects.size()));
+        if (aliveObjects.size() < list.size()) {
+            aliveObjects.addAll(IntStream.range(0, list.size() - aliveObjects.size())
+                    .mapToObj(i -> new MyDetectedObject(list.get(i), false, getPos(list.get(i))))
+                    .collect(Collectors.toList()));
+//            liveObjects.addAll(list.subList(0, list.size() - liveObjects.size()));
             // updateLiveObjPos();
         }
-
-        boolean[] keepOld = new boolean[ObjectManager_SIZE];
+        Log.i("pttt", "addObjects: bef atomiclist" + aliveObjects.toString());
+        boolean[] keepOld = new boolean[aliveObjects.size()];
         boolean[] addNew = new boolean[list.size()];
-        Arrays.fill(addNew,Boolean.TRUE);
-        for (int i = 0; i < liveObjects.size(); i++) {
+        Arrays.fill(addNew, Boolean.TRUE);
+        for (int i = 0; i < aliveObjects.size(); i++) {
             for (int j = 0; j < list.size(); j++) {
-                Detector.Recognition tempObj = liveObjects.get(i);
-                if (tempObj.getTitle().equals(list.get(j).getTitle()) && getPos(tempObj).equals(getPos(list.get(j)))) {
+                Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
+                if (tempObj.getTitle().equals(list.get(j).getTitle())/* && getPos(tempObj).equals(getPos(list.get(j)))*/) {
                     keepOld[i] = true;
                     addNew[j] = false;
                 }
             }
         }
 
-        for (int i = 0; i < liveObjects.size(); i++) {
+        for (int i = 0; i < aliveObjects.size(); i++) {
             if (!keepOld[i]) {
                 for (int j = 0; j < addNew.length; j++) {
                     if (addNew[j]) {
-                        liveObjects.set(i, list.get(j));
-                        alerted[i] = false;
+                        aliveObjects.set(i, new MyDetectedObject(list.get(j), false, getPos(list.get(j))));
+//                        alerted[i] = false;
                     }
                 }
             }
 
         }
+
+        Log.i("pttt", "addObjects: size" + atomicLiveObjects.size());
+        atomicLiveObjects.clear();
+        atomicLiveObjects.addAll(aliveObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
+
+        Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(atomicLiveObjects.toArray()));
+//        SystemClock.sleep(3000);
 
     }
 
@@ -195,4 +293,7 @@ public class ObjectsManager {
         }
 
     }
+
 }
+
+
