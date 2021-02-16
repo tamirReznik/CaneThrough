@@ -226,7 +226,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                         Log.i("pttt", "run: Thread id: "+Thread.currentThread().getId());
                         if (ObjectsManager.getInstance() != null)
-                            ObjectsManager.getInstance().addObjects(results.subList(0, ObjectManager_SIZE).stream().filter(res -> res.getConfidence() > 0.65).collect(Collectors.toList()));
+                            ObjectsManager.getInstance().addObjects(results.subList(0, ObjectManager_SIZE+1).stream().filter(res -> res.getConfidence() > 0.45).collect(Collectors.toList()));
 
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);

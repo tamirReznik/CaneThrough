@@ -13,7 +13,6 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.util.Log;
 import android.util.SizeF;
 
@@ -21,15 +20,12 @@ import org.tensorflow.lite.examples.detection.tflite.Detector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 //TODO - prevent duplicates of objects in liveobjects
 // fix concurrent data structures
@@ -146,20 +142,20 @@ public class ObjectsManager {
             public void run() {
 //                Log.i("pttt", "run: TimerTask id: " + Thread.currentThread().getId());
 
-//                MyAtomicRef[] myDetectedObject = new MyAtomicRef[atomicLiveObjects.size()];
-                ArrayList<MyAtomicRef> myDetectedObject = new ArrayList<>(atomicLiveObjects);
+//                MyAtomicRef[] myDetectedObjects = new MyAtomicRef[atomicLiveObjects.size()];
+                ArrayList<MyAtomicRef> myDetectedObjects = new ArrayList<>(atomicLiveObjects);
 
-//                Log.i("pttt", "run: myDetectedObject size: "+myDetectedObject.size()+" atomicLiveObjects.size(): " + atomicLiveObjects.size());
+//                Log.i("pttt", "run: myDetectedObjects size: "+myDetectedObjects.size()+" atomicLiveObjects.size(): " + atomicLiveObjects.size());
 
                 MyDetectedObject myObj;
 //                int i = 0;
-                for (int i = 0; i < myDetectedObject.size(); i++) {
+                for (int i = 0; i < myDetectedObjects.size(); i++) {
 
-                    if (myDetectedObject.get(i) == null) {
+                    if (myDetectedObjects.get(i) == null) {
                         Log.i("pttt", "run: object null");
                         return;
                     }
-                    myObj = myDetectedObject.get(i).get();
+                    myObj = myDetectedObjects.get(i).get();
                     if (!myObj.isAlerted()) {
                         Detector.Recognition tmpObj = myObj.getLiveObject();
                         Log.i("pttt", "run: alert : " + myObj.toString());
@@ -170,52 +166,12 @@ public class ObjectsManager {
 
                         }
                         myObj.setAlerted(true);
-
                     }
-                    myDetectedObject.set(i,new MyAtomicRef(myObj))  ;
+                    myDetectedObjects.set(i, new MyAtomicRef(myObj));
                 }
-
-//                for (int i = 0; i < myDetectedObject.length; i++) {
-//                    myObj = myDetectedObject[i].get();
-//                    if (!myObj.isAlerted()) {
-//                        Detector.Recognition tmpObj = myObj.getLiveObject();
-//                        // position[0].name();
-//                        if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
-//                            textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
-//                                    tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
-//
-//                        }
-//                        myObj.setAlerted(true);
-//
-//                    }
-//                    myDetectedObject[i] = new MyAtomicRef(myObj);
-//                }
-                atomicLiveObjects.addAll(myDetectedObject);
+                atomicLiveObjects.addAll(myDetectedObjects);
             }
         }, 0, 3000);
-
-//      new Runnable() {
-//            @Override
-//            public void run() {
-//                Log.i("pttt", "run: alerts array:" + Arrays.toString(alerted));
-//                for (int i = 0; i < liveObjects.size(); i++) {
-//                    if (!alerted[i]) {
-//                        Detector.Recognition tmpObj = liveObjects.get(i);
-//                        Log.i("handlerTag", "run: " + tmpObj.toString());
-//                        // position[0].name();
-//                        if (tmpObj.getTitle().equals(Labels_Keys.PERSON)) {
-//                            textToSpeech.speak(tmpObj.getTitle() + " " + distanceCalc(Labels_info.objectHeight.get(Labels_Keys.PERSON),
-//                                    tmpObj.getLocation().height()) + "meter " + getPos(tmpObj));
-//                            Log.i("handlerTag", "run: " + tmpObj.getLocation().centerX() + " pos: " + getPos(tmpObj));
-//                        }
-//                        alerted[i] = true;
-//                    }
-//                }
-//                handler.postDelayed(this, 4000);
-//            }
-//
-//        }.run();
-
 
     }
 
@@ -232,17 +188,16 @@ public class ObjectsManager {
 
 //        Log.i("pttt", "addObjects: alive Size" + aliveObjects.size());
 
-        if (aliveObjects.size() == 0) {
-            aliveObjects.addAll(list.stream()
-                    .map(obj -> new MyDetectedObject(obj, false, getPos(obj)))
-                    .collect(Collectors.toList()));
-            //  updateLiveObjPos();
-//            return;
-        }
+//        if (aliveObjects.size() == 0) {
+//            aliveObjects.addAll(list.stream()
+//                    .map(obj -> new MyDetectedObject(obj, false, getPos(obj)))
+//                    .collect(Collectors.toList()));
+////            return;
+//        }
 
-        if (aliveObjects.size() < list.size()) {
-            aliveObjects.addAll(IntStream.range(0, list.size() - aliveObjects.size())
-                    .mapToObj(i -> new MyDetectedObject(list.get(i), false, getPos(list.get(i))))
+        if (aliveObjects.size() < ObjectManager_SIZE) {
+            aliveObjects.addAll(list.stream().limit(Math.min(ObjectManager_SIZE - aliveObjects.size(), list.size()))
+                    .map(recognition -> new MyDetectedObject(recognition, false, getPos(recognition)))
                     .collect(Collectors.toList()));
 //            liveObjects.addAll(list.subList(0, list.size() - liveObjects.size()));
             // updateLiveObjPos();
@@ -273,7 +228,7 @@ public class ObjectsManager {
 
         }
 
-        Log.i("pttt", "addObjects: size" + atomicLiveObjects.size());
+        Log.i("pttt", "addObjects: size" + aliveObjects.size());
         atomicLiveObjects.clear();
         atomicLiveObjects.addAll(aliveObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
 
