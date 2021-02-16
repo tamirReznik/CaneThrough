@@ -9,4 +9,5 @@ public interface Labels_Keys {
     String BED = "bed";
     String BENCH = "bench";
     String CAR = "car";
+    String PERSON_FACE = "person ";
 }

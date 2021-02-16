@@ -36,14 +36,6 @@ import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
@@ -55,6 +47,14 @@ import org.tensorflow.lite.examples.detection.tflite.Detector;
 import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIModel;
 import org.tensorflow.lite.examples.detection.tracking.Distance_CallBack;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.ObjectManager_SIZE;
 
@@ -224,10 +224,13 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-                        Log.i("pttt", "run: Thread id: "+Thread.currentThread().getId());
-                        if (ObjectsManager.getInstance() != null)
-                            ObjectsManager.getInstance().addObjects(results.subList(0, ObjectManager_SIZE+1).stream().filter(res -> res.getConfidence() > 0.45).collect(Collectors.toList()));
-
+                        Log.i("pttt", "run: Thread id: " + Thread.currentThread().getId());
+                        if (ObjectsManager.getInstance() != null) {
+                            ObjectsManager.getInstance()
+                                    .addObjects(results.subList(0, ObjectManager_SIZE + 1)
+                                            .stream().filter(res -> res.getConfidence() > 0.60 && Labels_info.objectHeight.containsKey(res.getTitle()))
+                                            .collect(Collectors.toList()));
+                        }
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);
                         final Paint paint = new Paint();
@@ -244,8 +247,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
 
-                        for (int i = 0; i < results.size(); i++)
-                            Log.i("TAGtest", "run: " + results.get(i).getLocation().left + " right: " + results.get(i).getLocation().right + "\n");
+//                        for (int i = 0; i < results.size(); i++)
+//                            Log.i("TAGtest", "run: " + results.get(i).getLocation().left + " right: " + results.get(i).getLocation().right + "\n");
 
 
                         for (final Detector.Recognition result : results) {
