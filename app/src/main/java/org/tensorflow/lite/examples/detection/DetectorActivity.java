@@ -228,7 +228,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         if (ObjectsManager.getInstance() != null) {
                             ObjectsManager.getInstance()
                                     .addObjects(results.subList(0, ObjectManager_SIZE + 1)
-                                            .stream().filter(res -> res.getConfidence() > 0.60 && Labels_info.objectHeight.containsKey(res.getTitle()))
+                                            .stream().filter(res -> res.getConfidence() > 0.65 && Labels_info.objectHeight.containsKey(res.getTitle()))
                                             .collect(Collectors.toList()));
                         }
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);

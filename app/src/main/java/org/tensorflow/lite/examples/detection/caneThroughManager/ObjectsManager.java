@@ -194,7 +194,6 @@ public class ObjectsManager {
         ArrayList<MyDetectedObject> aliveObjects = atomicLiveObjects.stream()
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
-
 //        if (aliveObjects.size() == 0) {
 //            aliveObjects.addAll(list.stream()
 //                    .map(obj -> new MyDetectedObject(obj, false, getPos(obj)))
