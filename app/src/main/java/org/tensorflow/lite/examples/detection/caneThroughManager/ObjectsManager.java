@@ -230,6 +230,7 @@ public class ObjectsManager {
             for (int j = 0; j < list.size(); j++) {
                 Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
                 if (tempObj.getTitle().equals(list.get(j).getTitle()) && getPos(tempObj).equals(getPos(list.get(j)))) {
+                    //  Log.i("ptttnewobj", "addObjects: "+tempObj);
                     keepOld[i] = true;
                     addNew[j] = false;
                 }

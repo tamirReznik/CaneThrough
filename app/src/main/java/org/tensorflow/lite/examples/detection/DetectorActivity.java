@@ -227,7 +227,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         Log.i("pttt", "run: Thread id: " + Thread.currentThread().getId());
                         if (ObjectsManager.getInstance() != null) {
                             ObjectsManager.getInstance()
-                                    .addObjects(results.subList(0, ObjectManager_SIZE + 1)
+                                    .addObjects(results.subList(0, Math.min(ObjectManager_SIZE + 1, results.size()))
                                             .stream().filter(res -> res.getConfidence() > 0.65 && Labels_info.objectHeight.containsKey(res.getTitle()))
                                             .collect(Collectors.toList()));
                         }
