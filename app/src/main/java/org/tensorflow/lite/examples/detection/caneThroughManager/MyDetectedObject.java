@@ -67,6 +67,7 @@ public class MyDetectedObject {
         assert obj != null;
         if (getClass() != obj.getClass())
             return false;
+
         return this.hashCode() == obj.hashCode();
     }
 }

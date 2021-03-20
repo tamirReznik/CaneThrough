@@ -191,6 +191,14 @@ public class ObjectsManager {
         if (list.isEmpty()) {
             return;
         }
+
+        if (atomicLiveObjects.isEmpty()) {
+            atomicLiveObjects.addAll(list.stream()
+                    .map(obj -> new MyAtomicRef(new MyDetectedObject(obj, false, getPos(obj))))
+                    .collect(Collectors.toList()));
+            return;
+        }
+
         ArrayList<MyDetectedObject> aliveObjects = atomicLiveObjects.stream()
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
@@ -202,9 +210,16 @@ public class ObjectsManager {
 //        }
 
         if (aliveObjects.size() < ObjectManager_SIZE) {
-            aliveObjects.addAll(list.stream().limit(Math.min(ObjectManager_SIZE - aliveObjects.size(), list.size()))
-                    .map(recognition -> new MyDetectedObject(recognition, false, getPos(recognition)))
-                    .collect(Collectors.toList()));
+
+            int limit = Math.min(ObjectManager_SIZE - aliveObjects.size(), list.size());
+
+            aliveObjects
+                    .addAll(list.stream().limit(limit)
+                            .map(recognition -> new MyDetectedObject(recognition, false, getPos(recognition)))
+                            .collect(Collectors.toList()));
+
+            list.removeAll(list.subList(0, limit));
+
         }
 
         Log.i("pttt", "addObjects: bef atomiclist" + aliveObjects.toString());
@@ -214,7 +229,7 @@ public class ObjectsManager {
         for (int i = 0; i < aliveObjects.size(); i++) {
             for (int j = 0; j < list.size(); j++) {
                 Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
-                if (tempObj.getTitle().equals(list.get(j).getTitle())/* && getPos(tempObj).equals(getPos(list.get(j)))*/) {
+                if (tempObj.getTitle().equals(list.get(j).getTitle()) && getPos(tempObj).equals(getPos(list.get(j)))) {
                     keepOld[i] = true;
                     addNew[j] = false;
                 }
