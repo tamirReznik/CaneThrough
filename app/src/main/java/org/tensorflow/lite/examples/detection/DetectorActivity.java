@@ -37,6 +37,7 @@ import android.widget.Toast;
 import androidx.annotation.RequiresApi;
 
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
+import org.tensorflow.lite.examples.detection.caneThroughManager.MyDetectedObject;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
 import org.tensorflow.lite.examples.detection.customview.OverlayView;
 import org.tensorflow.lite.examples.detection.customview.OverlayView.DrawCallback;
@@ -51,12 +52,13 @@ import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.ObjectManager_SIZE;
+import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.getPos;
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -72,9 +74,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     private static final String TF_OD_API_LABELS_FILE = "labelmap.txt";
     private static final DetectorMode MODE = DetectorMode.TF_OD_API;
     // Minimum detection confidence to track a detection.
-    private static final float MINIMUM_CONFIDENCE_TF_OD_API = 0.5f;
+    private static final float MINIMUM_CONFIDENCE_TF_OD_API = 0.65f;
     private static final boolean MAINTAIN_ASPECT = false;
-    private static final Size DESIRED_PREVIEW_SIZE = new Size(640, 480);
+    private static final Size DESIRED_PREVIEW_SIZE = new Size(1920, 1080);
     private static final boolean SAVE_PREVIEW_BITMAP = false;
     private static final float TEXT_SIZE_DIP = 10;
     OverlayView trackingOverlay;
@@ -224,13 +226,29 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-                        Log.i("pttt", "run: Thread id: " + Thread.currentThread().getId());
-                        if (ObjectsManager.getInstance() != null) {
-                            ObjectsManager.getInstance()
-                                    .addObjects(results.subList(0, Math.min(ObjectManager_SIZE + 1, results.size()))
-                                            .stream().filter(res -> res.getConfidence() > 0.65 && Labels_info.objectHeight.containsKey(res.getTitle()))
-                                            .collect(Collectors.toList()));
-                        }
+//                        Log.i("pttt", "run: Thread id: " + Thread.currentThread().getId());
+//                        if (ObjectsManager.getInstance() != null) {
+//                            int indexCounter = 0;
+//                            HashSet<MyDetectedObject> detectionsSet = new HashSet<>();
+//                            while (indexCounter < results.size() && detectionsSet.size() < ObjectManager_SIZE) {
+//                                Detector.Recognition detectedObject = results.get(indexCounter);
+//                                RectF location = detectedObject.getLocation();
+//                                //cropToFrameTransform.mapRect(location);
+//                                detectedObject.setLocation(location);
+//                                if (detectedObject.getConfidence() > .65 && Labels_info.objectHeight.containsKey(detectedObject.getTitle())) {
+//
+//                                    MyDetectedObject tmpObj = new MyDetectedObject(detectedObject, false, getPos(detectedObject));
+//                                    detectionsSet.add(tmpObj);
+//                                    Log.i("ptttalertequal", "run: eaqual? : " + tmpObj + " position: " + tmpObj.getLiveObject().getLocation().centerX());
+//                                }
+//                                indexCounter++;
+//                            }
+//                            ObjectsManager.getInstance().addObjects(detectionsSet);
+////                            ObjectsManager.getInstance()
+////                                    .addObjects(results.subList(0, Math.min(ObjectManager_SIZE + 1, results.size()))
+////                                            .stream().filter(res -> res.getConfidence() > 0.65 && Labels_info.objectHeight.containsKey(res.getTitle()))
+////                                            .collect(Collectors.toList()));
+//                        }
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);
                         final Paint paint = new Paint();
@@ -246,11 +264,9 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         }
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
-
+                        HashSet<MyDetectedObject> detectionsSet = new HashSet<>();
 //                        for (int i = 0; i < results.size(); i++)
 //                            Log.i("TAGtest", "run: " + results.get(i).getLocation().left + " right: " + results.get(i).getLocation().right + "\n");
-
-
                         for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
@@ -281,12 +297,18 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 //                                    if (Math.abs(personLastLocation - personDistance) > 100)
 //                                        Utils.soundReport(result, personDistance);
 //                                }
-
                                 cropToFrameTransform.mapRect(location);
-                                Log.i("size", "onPreviewSize beforeupdate : Height: " + (result.getLocation().top + result.getLocation().bottom) + "width " + (location.right - location.left));
                                 result.setLocation(location);
-                                Log.i("size", "onPreviewSizeChosen: Height: " + (-result.getLocation().top + result.getLocation().bottom) + "width " + (result.getLocation().right - result.getLocation().left));
                                 mappedRecognitions.add(result);
+
+                                if (ObjectsManager.getInstance() != null) {
+                                    if (detectionsSet.size() < ObjectManager_SIZE && Labels_info.objectHeight.containsKey(result.getTitle())) {
+                                        MyDetectedObject tmpObj = new MyDetectedObject(result, false, getPos(result));
+                                        detectionsSet.add(tmpObj);
+                                    }
+                                    ObjectsManager.getInstance().addObjects(detectionsSet);
+                                }
+
                             }
                         }
 

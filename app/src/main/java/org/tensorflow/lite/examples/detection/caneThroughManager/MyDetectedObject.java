@@ -5,7 +5,7 @@ import androidx.annotation.Nullable;
 
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 
-import java.util.ArrayList;
+import java.util.Objects;
 
 public class MyDetectedObject {
 //
@@ -53,12 +53,12 @@ public class MyDetectedObject {
     @NonNull
     @Override
     public String toString() {
-        return liveObject.toString() + " alerted: " + isAlerted();
+        return liveObject.toString() + " alerted: " + isAlerted() + " position: " + getPos();
     }
 
     @Override
     public int hashCode() {
-        return liveObject.getTitle().hashCode() + pos.hashCode();
+        return Objects.hash(liveObject.getTitle().hashCode(), pos.name().hashCode());
     }
 
     @Override
