@@ -15,15 +15,18 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.SizeF;
+import android.widget.Toast;
 
+import org.tensorflow.lite.examples.detection.CameraActivity;
+import org.tensorflow.lite.examples.detection.DetectorActivity;
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -32,42 +35,20 @@ import java.util.stream.Collectors;
 public class ObjectsManager {
 
     public static final int ObjectManager_SIZE = 3;
-
-
-    enum Position {
-        LEFT,
-        CENTER,
-        RIGHT,
-        UNKNOWN
-    }
-
+    private static ObjectsManager instance;
+    private final Handler handler;
+    private final Context context;
+    //    ArrayList<AtomicReference<MyDetectedObject>> atomicLiveObjects;
+    HashSet<MyAtomicRef> atomicLiveObjects;
     private Float focalLength;
     private Float heightSensor, widthSensor;
     private Float imageHeight, imageWidth;
-    private final Handler handler;
-    private final Context context;
-    private boolean[] alerted;
-    private static ObjectsManager instance;
+    private final boolean[] alerted;
     private TTSManager textToSpeech;
     private Timer timer;
+    private long lastAlert;
 //    private ArrayList<Detector.Recognition> liveObjects;
 
-
-    //    ArrayList<AtomicReference<MyDetectedObject>> atomicLiveObjects;
-    HashSet<MyAtomicRef> atomicLiveObjects;
-
-
-    public static ObjectsManager getInstance() {
-        return instance;
-    }
-
-
-    public static void init(Context context, String cameraId) {
-        Log.i("handlerTag", "run: ");
-        if (instance == null) {
-            instance = new ObjectsManager(context, cameraId);
-        }
-    }
 
     private ObjectsManager(Context context, String cameraId) {
 
@@ -86,6 +67,30 @@ public class ObjectsManager {
 
         Log.i("CT_log", "ObjectsManager: focal" + focalLength + " height sensor: " + heightSensor + " width sensor: " + widthSensor);
 
+
+    }
+
+    public static ObjectsManager getInstance() {
+        return instance;
+    }
+
+
+    public static void init(Context context, String cameraId) {
+        Log.i("handlerTag", "run: ");
+        if (instance == null) {
+            instance = new ObjectsManager(context, cameraId);
+        }
+    }
+
+    public static Position getPos(Detector.Recognition obj) {
+
+        if (obj.getLocation().centerX() <= 512) {
+            return Position.LEFT;
+        } else if (obj.getLocation().centerX() >= 1048) {
+            return Position.RIGHT;
+        } else {
+            return Position.CENTER;
+        }
 
     }
 
@@ -147,37 +152,41 @@ public class ObjectsManager {
         float result = (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) / 1000;
         Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight + " pixW:" + tmpObj.getLocation().width());
         return (int) result;
+
     }
 
     private void initAlertRunnable() {
-
 
         timer = new Timer();
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                ArrayList<MyAtomicRef> myDetectedObjects = new ArrayList<>(atomicLiveObjects);
+
+                ArrayList<MyDetectedObject> myDetectedObjects = atomicLiveObjects.stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
 
                 MyDetectedObject myObj;
 
                 for (int i = 0; i < myDetectedObjects.size(); i++) {
 
                     if (myDetectedObjects.get(i) == null) {
-                        return;
+                        continue;
                     }
-                    myObj = myDetectedObjects.get(i).get();
-                    if (!myObj.isAlerted()) {
+                    if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
                         Detector.Recognition tmpObj = myObj.getLiveObject();
                         if (/*tmpObj.getTitle().equals(Labels_Keys.PERSON)||*/ Labels_info.objectHeight.containsKey(tmpObj.getTitle())) {
                             playAlert(tmpObj);
                         }
                         myObj.setAlerted(true);
+                        myDetectedObjects.set(i,myObj);
                     }
-                    myDetectedObjects.set(i, new MyAtomicRef(myObj));
                 }
-                atomicLiveObjects.addAll(myDetectedObjects);
+                atomicLiveObjects.addAll(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
+                long currentTime = System.nanoTime();
+                long elapsedTime = currentTime - lastAlert;
+                Log.i("ptttTime", "run: " + TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS));
+                lastAlert = currentTime;
             }
-        }, 0, 3000);
+        }, 0, 3010);
 
     }
 
@@ -185,12 +194,12 @@ public class ObjectsManager {
 
         textToSpeech.speak(tmpObj.getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
                 tmpObj.getLocation().height())*/distanceCalc(tmpObj) + "meter " + getPos(tmpObj));
-        Log.i("ptttalert", "playAlert: "+tmpObj+" pos: "+ getPos(tmpObj)+" center: "+tmpObj.getLocation().centerX());
+        Log.i("ptttalert", "playAlert: " + tmpObj + " pos: " + getPos(tmpObj) + " center: " + tmpObj.getLocation().centerX());
     }
 
     public void addObjects(HashSet<MyDetectedObject> objCollection) {
 
-        Log.i("ptttaddObjectsSet", "addObjects: hashset: "+objCollection.toString());
+        Log.i("ptttaddObjectsSet", "addObjects: hashset: " + objCollection.toString());
         if (objCollection.isEmpty()) {
             return;
         }
@@ -240,11 +249,11 @@ public class ObjectsManager {
         for (int i = 0; i < aliveObjects.size(); i++) {
             Log.i("ptttaddObjects", "addObjects: index: " + i);
             for (int j = 0; j < list.size(); j++) {
-               MyDetectedObject tempObj = aliveObjects.get(i);
-              //  Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
+                MyDetectedObject tempObj = aliveObjects.get(i);
+                //  Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
                 Log.i("ptttaddObjects", "addObjects: obj:" + tempObj);
                 if (tempObj.equals(list.get(j))) {
-              //  if (tempObj.getTitle().equals(list.get(j).getLiveObject().getTitle()) && getPos(tempObj).equals(getPos(list.get(j).getLiveObject()))) {
+                    //  if (tempObj.getTitle().equals(list.get(j).getLiveObject().getTitle()) && getPos(tempObj).equals(getPos(list.get(j).getLiveObject()))) {
                     Log.i("ptttaddObjects", "addnewObjects: " + tempObj);
                     keepOld[i] = true;
                     addNew[j] = false;
@@ -256,8 +265,8 @@ public class ObjectsManager {
             if (!keepOld[i]) {
                 for (int j = 0; j < addNew.length; j++) {
                     if (addNew[j]) {
-                        aliveObjects.set(i,list.get(j));
-                      //  aliveObjects.set(i, new MyDetectedObject(list.get(j), false, getPos(list.get(j))));
+                        aliveObjects.set(i, list.get(j));
+                        //  aliveObjects.set(i, new MyDetectedObject(list.get(j), false, getPos(list.get(j))));
                     }
                 }
             }
@@ -271,16 +280,11 @@ public class ObjectsManager {
         Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(atomicLiveObjects.toArray()));
     }
 
-    public static Position getPos(Detector.Recognition obj) {
-
-        if (obj.getLocation().centerX() <= 512) {
-            return Position.LEFT;
-        } else if (obj.getLocation().centerX() >= 1048) {
-            return Position.RIGHT;
-        } else {
-            return Position.CENTER;
-        }
-
+    enum Position {
+        LEFT,
+        CENTER,
+        RIGHT,
+        UNKNOWN
     }
 
 }

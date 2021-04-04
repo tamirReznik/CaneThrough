@@ -111,6 +111,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     float personLastLocation = 0;
     float mouseLastLocation = 0;
 
+
     @Override
     public void onPreviewSizeChosen(final Size size, final int rotation) {
 
