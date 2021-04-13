@@ -1,7 +1,6 @@
 package org.tensorflow.lite.examples.detection.caneThroughManager;
 
 import android.content.Context;
-import android.os.Build;
 import android.speech.tts.TextToSpeech;
 
 import java.util.Locale;
@@ -32,14 +31,10 @@ public class TTSManager {
 
     public void speak(CharSequence text) {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            if (tts.speak(text.toString(), TextToSpeech.QUEUE_FLUSH, null, null) == TextToSpeech.ERROR) {
-                throw new RuntimeException("Text To Speech failed to speak");
-            }
-        } else {
-            if (tts.speak(text.toString(), TextToSpeech.QUEUE_FLUSH, null) == TextToSpeech.ERROR) {
-                throw new RuntimeException("Text To Speech failed to speak");
-            }
+        if (text == null || text.length() <= 0)
+            return;
+        if (tts.speak(text.toString(), TextToSpeech.QUEUE_FLUSH, null, null) == TextToSpeech.ERROR) {
+            throw new RuntimeException("Text To Speech failed to speak");
         }
 
     }

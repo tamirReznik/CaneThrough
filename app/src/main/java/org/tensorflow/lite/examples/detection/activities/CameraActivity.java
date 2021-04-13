@@ -14,13 +14,19 @@
  * limitations under the License.
  */
 
-package org.tensorflow.lite.examples.detection;
+package org.tensorflow.lite.examples.detection.activities;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.Fragment;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.hardware.Camera;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -29,40 +35,37 @@ import android.media.Image;
 import android.media.Image.Plane;
 import android.media.ImageReader;
 import android.media.ImageReader.OnImageAvailableListener;
-import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Trace;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.SwitchCompat;
-import androidx.appcompat.widget.Toolbar;
-
 import android.util.Log;
 import android.util.Size;
 import android.view.Surface;
 import android.view.View;
 import android.view.ViewTreeObserver;
-import android.view.WindowManager;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
+import androidx.appcompat.widget.Toolbar;
+
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+
+import org.tensorflow.lite.examples.detection.R;
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
+import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
+import org.tensorflow.lite.examples.detection.env.ImageUtils;
+import org.tensorflow.lite.examples.detection.env.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
-
-import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
-import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
-import org.tensorflow.lite.examples.detection.caneThroughManager.TTSManager;
-import org.tensorflow.lite.examples.detection.env.ImageUtils;
-import org.tensorflow.lite.examples.detection.env.Logger;
 
 public abstract class CameraActivity extends AppCompatActivity
         implements OnImageAvailableListener,
@@ -80,6 +83,8 @@ public abstract class CameraActivity extends AppCompatActivity
     private Handler handler;
     private HandlerThread handlerThread;
     private boolean useCamera2API;
+
+
     private boolean isProcessingFrame = false;
     private byte[][] yuvBytes = new byte[3][];
     private int[] rgbBytes = null;
@@ -97,16 +102,20 @@ public abstract class CameraActivity extends AppCompatActivity
     private SwitchCompat apiSwitchCompat;
     private TextView threadsTextView;
 
+    // sensors
+    private static SensorManager sensorManager;
+    private Sensor magnetSensor, accelerometerSensor, rotationVectorSensor;
+    private boolean magnetExist, accelerometerExist, rotationVectorExist;
+    private boolean lastAccelerometerSet = false, lastMagnetometerSet = false;
+    private SensorEventListener sensorEventListener;
+    float azimuth, pitch, roll;
+    private float[] rMat = new float[9];
+    private float[] orientation = new float[9];
+    private float[] lastAccelerometer = new float[3];
+    private float[] lastMagnetometer = new float[3];
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
-
-
-//        TTSManager.init(getApplicationContext());
-//        mediaPlayer = MediaPlayer.create(getApplicationContext(), R.raw.beep);
-////        mediaPlayer.setLooping(true);
-//        mediaPlayer.setVolume(0, 0);
-//        mediaPlayer.start();
 
 
         LOGGER.d("onCreate " + this);
@@ -121,6 +130,8 @@ public abstract class CameraActivity extends AppCompatActivity
 
         //Todo - CaneThrough
         getSupportActionBar().hide();
+        InitSensors();
+
 
         if (hasPermission()) {
             setFragment();
@@ -192,6 +203,90 @@ public abstract class CameraActivity extends AppCompatActivity
         plusImageView.setOnClickListener(this);
         minusImageView.setOnClickListener(this);
     }
+
+
+    private void InitSensors() {
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        startSensors();
+        magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        sensorEventListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+                    SensorManager.getRotationMatrixFromVector(rMat, event.values);
+                    azimuth = (int) (Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360;
+                }
+                if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                    System.arraycopy(event.values, 0, lastAccelerometer, 0, event.values.length);
+                    lastAccelerometerSet = true;
+                } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                    System.arraycopy(event.values, 0, magnetSensor, 0, event.values.length);
+                    lastMagnetometerSet = true;
+                }
+
+                if (lastMagnetometerSet && lastAccelerometerSet) {
+                    SensorManager.getRotationMatrix(rMat, null, lastAccelerometer, lastMagnetometer);
+                    SensorManager.getOrientation(rMat, orientation);
+                    azimuth = (int) ((Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360);
+                }
+
+
+                azimuth = Math.round(azimuth);
+
+                if (ObjectsManager.getInstance() != null) {
+                    ObjectsManager.setAzimuthIndex(((int) azimuth) / 10);
+                }
+
+                double tesla = Math.sqrt((azimuth * azimuth) + (pitch * pitch) + (roll * roll));
+                Log.i("ptttAzimuth", "onSensorChanged: " + azimuth);
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+            }
+        };
+    }
+
+    public void noSensorAlert() {
+        AlertDialog.Builder sensorAlertDialog = new AlertDialog.Builder(this);
+        sensorAlertDialog.setMessage("your device doesn't support the needed sensors")
+                .setCancelable(false)
+                .setNegativeButton("Close", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                });
+    }
+
+    void startSensors() {
+        if (sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) == null) {
+            if (sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) == null
+                    || sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) == null) {
+                noSensorAlert();
+            } else {
+                accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+                magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+
+                magnetExist = sensorManager.registerListener(sensorEventListener, magnetSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                accelerometerExist = sensorManager.registerListener(sensorEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            }
+        } else {
+            rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+            rotationVectorExist = sensorManager.registerListener(sensorEventListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    public void stopSensors() {
+        if (rotationVectorExist) {
+            sensorManager.unregisterListener(sensorEventListener, rotationVectorSensor);
+        } else if (accelerometerExist && magnetExist) {
+            sensorManager.unregisterListener(sensorEventListener, magnetSensor);
+            sensorManager.unregisterListener(sensorEventListener, accelerometerSensor);
+        }
+    }
+
 
     protected int[] getRgbBytes() {
         imageConverter.run();
@@ -330,6 +425,8 @@ public abstract class CameraActivity extends AppCompatActivity
         LOGGER.d("onResume " + this);
         super.onResume();
 
+        startSensors();
+
         handlerThread = new HandlerThread("inference");
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
@@ -339,6 +436,7 @@ public abstract class CameraActivity extends AppCompatActivity
     public synchronized void onPause() {
         LOGGER.d("onPause " + this);
 
+        stopSensors();
         handlerThread.quitSafely();
         try {
             handlerThread.join();
@@ -475,7 +573,7 @@ public abstract class CameraActivity extends AppCompatActivity
                                 public void onPreviewSizeChosen(final Size size, final int rotation) {
                                     previewHeight = size.getHeight();
                                     previewWidth = size.getWidth();
-                                    Log.i(Labels_Keys.CANE_THROUGH_LOG, "onPreviewSizeChosen: previewHeight "+previewHeight+" "+ previewWidth);
+                                    Log.i(Labels_Keys.CANE_THROUGH_LOG, "onPreviewSizeChosen: previewHeight " + previewHeight + " " + previewWidth);
                                     CameraActivity.this.onPreviewSizeChosen(size, rotation);
                                 }
                             },

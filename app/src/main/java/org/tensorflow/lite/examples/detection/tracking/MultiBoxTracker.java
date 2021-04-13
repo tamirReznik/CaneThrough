@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Queue;
 
-import org.tensorflow.lite.examples.detection.DetectorActivity;
+import org.tensorflow.lite.examples.detection.activities.DetectorActivity;
 import org.tensorflow.lite.examples.detection.env.BorderedText;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;

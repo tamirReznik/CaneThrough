@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.tensorflow.lite.examples.detection;
+package org.tensorflow.lite.examples.detection.activities;
 
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
@@ -36,6 +36,7 @@ import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
 
+import org.tensorflow.lite.examples.detection.R;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.MyDetectedObject;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;

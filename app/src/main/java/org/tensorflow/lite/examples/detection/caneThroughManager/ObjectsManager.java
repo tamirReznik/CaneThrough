@@ -15,15 +15,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.util.SizeF;
-import android.widget.Toast;
 
-import org.tensorflow.lite.examples.detection.CameraActivity;
-import org.tensorflow.lite.examples.detection.DetectorActivity;
 import org.tensorflow.lite.examples.detection.tflite.Detector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
@@ -33,13 +32,23 @@ import java.util.stream.Collectors;
 //TODO - prevent duplicates of objects in liveobjects
 // fix concurrent data structures
 public class ObjectsManager {
+    enum Position {
+        LEFT,
+        CENTER,
+        RIGHT,
+        UNKNOWN
+    }
 
     public static final int ObjectManager_SIZE = 3;
+
+
+    private static int azimuthIndex = -1;
     private static ObjectsManager instance;
     private final Handler handler;
     private final Context context;
     //    ArrayList<AtomicReference<MyDetectedObject>> atomicLiveObjects;
     HashSet<MyAtomicRef> atomicLiveObjects;
+    //HashMap<Integer,MyAtomicRef>atomicLiveObjects;
     private Float focalLength;
     private Float heightSensor, widthSensor;
     private Float imageHeight, imageWidth;
@@ -52,13 +61,11 @@ public class ObjectsManager {
 
     private ObjectsManager(Context context, String cameraId) {
 
-//        atomicLiveObjects = new ArrayList<>();
-
         atomicLiveObjects = new HashSet<>();
-//        liveObjects = new ArrayList<>();
         alerted = new boolean[ObjectManager_SIZE];
         handler = new Handler(Looper.myLooper());
 
+        azimuthIndex = 0;
         this.context = context.getApplicationContext();
 
         initVoiceAlerts();
@@ -76,7 +83,6 @@ public class ObjectsManager {
 
 
     public static void init(Context context, String cameraId) {
-        Log.i("handlerTag", "run: ");
         if (instance == null) {
             instance = new ObjectsManager(context, cameraId);
         }
@@ -165,21 +171,26 @@ public class ObjectsManager {
                 ArrayList<MyDetectedObject> myDetectedObjects = atomicLiveObjects.stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
 
                 MyDetectedObject myObj;
-
+                StringBuilder alert = new StringBuilder();
                 for (int i = 0; i < myDetectedObjects.size(); i++) {
 
                     if (myDetectedObjects.get(i) == null) {
                         continue;
                     }
+
                     if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
                         Detector.Recognition tmpObj = myObj.getLiveObject();
                         if (/*tmpObj.getTitle().equals(Labels_Keys.PERSON)||*/ Labels_info.objectHeight.containsKey(tmpObj.getTitle())) {
-                            playAlert(tmpObj);
+                            alert.append(tmpObj.getTitle()).append(" ").append( /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
+
+//                             playAlert(tmpObj);
                         }
                         myObj.setAlerted(true);
-                        myDetectedObjects.set(i,myObj);
+                        myDetectedObjects.set(i, myObj);
                     }
                 }
+                textToSpeech.speak(alert.toString());
                 atomicLiveObjects.addAll(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
                 long currentTime = System.nanoTime();
                 long elapsedTime = currentTime - lastAlert;
@@ -188,6 +199,112 @@ public class ObjectsManager {
             }
         }, 0, 3010);
 
+    }
+
+    void startAlert(HashMap<String, List<MyDetectedObject>> objectsToAlert) {
+        textToSpeech.speak("4");
+        List<MyDetectedObject> currentType = new ArrayList<>();
+        for (String key : objectsToAlert.keySet()) {
+            Log.i("ptttAlert", "startAlert: " + objectsToAlert.keySet());
+            currentType.clear();
+            currentType = objectsToAlert.get(key);
+            assert currentType != null;
+            if (currentType.size() == 1) {
+                textToSpeech.speak(currentType.iterator().next().getLiveObject().getTitle()
+                        + " " + distanceCalc(currentType.iterator().next().getLiveObject())
+                        + "meter " + getPos(currentType.iterator().next().getLiveObject()));
+            }
+            if (currentType.size() == 2) {
+                textToSpeech.speak("A " + currentType.get(0).getLiveObject().getTitle()
+                        + " At " + currentType.get(0).getPos()
+                        + "And " + currentType.get(1).getPos());
+            }
+            if (currentType.size() == 3) {
+                textToSpeech.speak("A " + currentType.get(0).getLiveObject().getTitle()
+                        + " At " + currentType.get(0).getPos()
+                        + " " + currentType.get(1).getPos()
+                        + "And " + currentType.get(2).getPos());
+            }
+        }
+
+    }
+
+    void playAlert2(List<Detector.Recognition> tmpObjList) {
+
+        if (tmpObjList == null || tmpObjList.isEmpty())
+            return;
+        switch (tmpObjList.size()) {
+            case 1:
+                textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
+                Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
+                break;
+            case 2:
+                if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(1).getTitle())) {
+                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
+                            + " And " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
+
+                } else {
+                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
+                            + " And " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
+                }
+                break;
+            case 3:
+                if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(1).getTitle())) {
+                    if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(2).getTitle())) {
+                        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
+                                + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
+                                + " And " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
+                    } else {
+                        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
+                                + " " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
+                                + " And " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2)));
+                    }
+                } else if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(2).getTitle())) {
+                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
+                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
+                            + " And " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
+
+                } else if (tmpObjList.get(1).getTitle().equals(tmpObjList.get(2).getTitle())) {
+                    textToSpeech.speak(tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
+                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
+                            + " And " + tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
+                } else {
+                    textToSpeech.speak(tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
+                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
+                            + " And " + tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
+                }
+
+
+                break;
+        }
+
+        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
+        Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
+
+        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/distanceCalc(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
+        Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
     }
 
     void playAlert(Detector.Recognition tmpObj) {
@@ -234,27 +351,23 @@ public class ObjectsManager {
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-//        if (aliveObjects.size() == 0) {
-//            aliveObjects.addAll(list.stream()
-//                    .map(obj -> new MyDetectedObject(obj, false, getPos(obj)))
-//                    .collect(Collectors.toList()));
-//            return;
-//        }
-
 
         Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
         boolean[] keepOld = new boolean[aliveObjects.size()];
         boolean[] addNew = new boolean[list.size()];
         Arrays.fill(addNew, Boolean.TRUE);
+        MyDetectedObject aliveObj, newObj;
         for (int i = 0; i < aliveObjects.size(); i++) {
             Log.i("ptttaddObjects", "addObjects: index: " + i);
+            aliveObj = aliveObjects.get(i);
             for (int j = 0; j < list.size(); j++) {
-                MyDetectedObject tempObj = aliveObjects.get(i);
-                //  Detector.Recognition tempObj = aliveObjects.get(i).getLiveObject();
-                Log.i("ptttaddObjects", "addObjects: obj:" + tempObj);
-                if (tempObj.equals(list.get(j))) {
-                    //  if (tempObj.getTitle().equals(list.get(j).getLiveObject().getTitle()) && getPos(tempObj).equals(getPos(list.get(j).getLiveObject()))) {
-                    Log.i("ptttaddObjects", "addnewObjects: " + tempObj);
+                newObj = list.get(j);
+
+                Log.i("ptttaddObjects", "addObjects: obj:" + aliveObj);
+                if (aliveObj.equals(newObj)) {
+                    Log.i("ptttaddObjects", "addnewObjects: " + aliveObj);
+                    newObj.setAlerted(true);
+                    aliveObjects.set(i, newObj);
                     keepOld[i] = true;
                     addNew[j] = false;
                 }
@@ -263,12 +376,15 @@ public class ObjectsManager {
 
         for (int i = 0; i < aliveObjects.size(); i++) {
             if (!keepOld[i]) {
-                for (int j = 0; j < addNew.length; j++) {
+                int j;
+                for (j = 0; j < addNew.length; j++) {
                     if (addNew[j]) {
                         aliveObjects.set(i, list.get(j));
-                        //  aliveObjects.set(i, new MyDetectedObject(list.get(j), false, getPos(list.get(j))));
+                        break;
                     }
                 }
+                if (j >= addNew.length)
+                    break;
             }
 
         }
@@ -280,13 +396,9 @@ public class ObjectsManager {
         Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(atomicLiveObjects.toArray()));
     }
 
-    enum Position {
-        LEFT,
-        CENTER,
-        RIGHT,
-        UNKNOWN
+    public static void setAzimuthIndex(int azimuthIndex) {
+        ObjectsManager.azimuthIndex = azimuthIndex;
     }
-
 }
 
 

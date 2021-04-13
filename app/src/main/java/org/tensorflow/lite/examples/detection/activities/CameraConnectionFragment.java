@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.tensorflow.lite.examples.detection;
+package org.tensorflow.lite.examples.detection.activities;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -25,7 +25,6 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Configuration;
-import android.graphics.Camera;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
@@ -62,6 +61,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
+import org.tensorflow.lite.examples.detection.R;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.customview.AutoFitTextureView;
 import org.tensorflow.lite.examples.detection.env.Logger;

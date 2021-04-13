@@ -17,7 +17,7 @@
         android:theme="@style/AppTheme.ObjectDetection">
 
         <activity
-            android:name=".DetectorActivity"
+            android:name=".activities.DetectorActivity"
             android:label="@string/tfe_od_app_name"
             android:screenOrientation="landscape">
             <intent-filter>
