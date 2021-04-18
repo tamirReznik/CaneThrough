@@ -1,4 +1,7 @@
 <resources>
+    <string name="kws_caption">To start demonstration say \"oh mighty computer\".</string>
+
     <string name="tfe_od_app_name" translation_description="Object Detection demo app [CHAR_LIMIT=40]">TFL Detect</string>
+    <string name="CaneThrough" translation_description="Blind Assistant App [CHAR_LIMIT=40]">Cane Through</string>
     <string name="tfe_od_camera_error" translation_description="Error regarding camera support[CHAR_LIMIT=40]">This device doesn\'t support Camera2 API.</string>
 </resources>

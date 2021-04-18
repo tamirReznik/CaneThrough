@@ -16,6 +16,8 @@
 
 package org.tensorflow.lite.examples.detection.activities;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Bitmap.Config;
 import android.graphics.Canvas;
@@ -26,7 +28,9 @@ import android.graphics.Paint.Style;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.media.ImageReader.OnImageAvailableListener;
+import android.os.AsyncTask;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
@@ -35,6 +39,8 @@ import android.util.TypedValue;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import org.tensorflow.lite.examples.detection.R;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
@@ -50,7 +56,9 @@ import org.tensorflow.lite.examples.detection.tflite.TFLiteObjectDetectionAPIMod
 import org.tensorflow.lite.examples.detection.tracking.Distance_CallBack;
 import org.tensorflow.lite.examples.detection.tracking.MultiBoxTracker;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,6 +66,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import edu.cmu.pocketsphinx.Assets;
+import edu.cmu.pocketsphinx.Hypothesis;
+import edu.cmu.pocketsphinx.RecognitionListener;
+import edu.cmu.pocketsphinx.SpeechRecognizer;
+import edu.cmu.pocketsphinx.SpeechRecognizerSetup;
+
+import static android.widget.Toast.makeText;
 import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.ObjectManager_SIZE;
 import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.getPos;
 
@@ -65,7 +80,7 @@ import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsM
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
  * objects.
  */
-public class DetectorActivity extends CameraActivity implements OnImageAvailableListener {
+public class DetectorActivity extends CameraActivity implements OnImageAvailableListener, RecognitionListener {
     private static final Logger LOGGER = new Logger();
 
     // Configuration values for the prepackaged SSD model.
@@ -112,6 +127,32 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     float personLastLocation = 0;
     float mouseLastLocation = 0;
 
+    // voice command
+    private static final String KWS_SEARCH = "wakeup";
+    private static final String KEYPHRASE = "cane through";
+    private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
+    private SpeechRecognizer recognizer;
+    private HashMap<String, Integer> captions;
+
+    public void initVoiceCommand() {
+        captions = new HashMap<>();
+        captions.put(KWS_SEARCH, R.string.kws_caption);
+
+        int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO);
+        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSIONS_REQUEST_RECORD_AUDIO);
+            return;
+        }
+        // Recognizer initialization is a time-consuming and it involves IO,
+        // so we execute it in async task
+        new SetupTask(this).execute();
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        initVoiceCommand();
+    }
 
     @Override
     public void onPreviewSizeChosen(final Size size, final int rotation) {
@@ -194,7 +235,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     @Override
     protected void processImage() {
 
-
+        ObjectsManager objectsManager = ObjectsManager.getInstance();
         ++timestamp;
         final long currTimestamp = timestamp;
         trackingOverlay.postInvalidate();
@@ -303,12 +344,12 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 result.setLocation(location);
                                 mappedRecognitions.add(result);
 
-                                if (ObjectsManager.getInstance() != null) {
+                                if (objectsManager != null) {
                                     if (detectionsSet.size() < ObjectManager_SIZE && Labels_info.objectHeight.containsKey(result.getTitle())) {
                                         MyDetectedObject tmpObj = new MyDetectedObject(result, false, getPos(result));
                                         detectionsSet.add(tmpObj);
                                     }
-                                    ObjectsManager.getInstance().addObjects(detectionsSet);
+                                    objectsManager.addObjects(detectionsSet);
                                 }
 
                             }
@@ -372,6 +413,135 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 });
                     }
                 });
+    }
+
+    @Override
+    public synchronized void onDestroy() {
+        super.onDestroy();
+        if (recognizer != null) {
+            recognizer.cancel();
+            recognizer.shutdown();
+        }
+    }
+
+    @Override
+    public void onResult(Hypothesis hypothesis) {
+        Log.i("ptttVoiceCmd", "onResult: wake up voice command BEFORE ");
+        if (hypothesis != null) {
+            String text = hypothesis.getHypstr();
+            makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show();
+            Log.i("ptttVoiceCmd", "onResult: wake up voice command");
+            ObjectsManager om = ObjectsManager.getInstance();
+            if (om != null) {
+                om.initiatedAlert();
+            }
+        }
+    }
+
+    @Override
+    public void onBeginningOfSpeech() {
+    }
+
+    /**
+     * We stop recognizer here to get a final result
+     */
+    @Override
+    public void onEndOfSpeech() {
+        if (!recognizer.getSearchName().equals(KWS_SEARCH))
+            switchSearch(KWS_SEARCH);
+    }
+
+    /**
+     * In partial result we get quick updates about current hypothesis. In
+     * keyword spotting mode we can react here, in other modes we need to wait
+     * for final result in onResult.
+     */
+    @Override
+    public void onPartialResult(Hypothesis hypothesis) {
+        if (hypothesis == null)
+            return;
+
+        String text = hypothesis.getHypstr();
+        if (text.equals(KEYPHRASE))
+            switchSearch("MENU_SEARCH");
+    }
+
+    private static class SetupTask extends AsyncTask<Void, Void, Exception> {
+        WeakReference<DetectorActivity> activityReference;
+
+        SetupTask(DetectorActivity activity) {
+            this.activityReference = new WeakReference<>(activity);
+        }
+
+        @Override
+        protected Exception doInBackground(Void... params) {
+            try {
+                Assets assets = new Assets(activityReference.get());
+                File assetDir = assets.syncAssets();
+                activityReference.get().setupRecognizer(assetDir);
+            } catch (IOException e) {
+                return e;
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Exception result) {
+            if (result != null) {
+//                ((TextView) activityReference.get().findViewById(R.id.caption_text))
+//                        .setText("Failed to init recognizer " + result);
+            } else {
+                activityReference.get().switchSearch(KWS_SEARCH);
+            }
+        }
+    }
+
+
+    @Override
+    public void onError(Exception error) {
+        Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onTimeout() {
+        switchSearch(KWS_SEARCH);
+    }
+
+    private void setupRecognizer(File assetsDir) throws IOException {
+        // The recognizer can be configured to perform multiple searches
+        // of different kind and switch between them
+
+        recognizer = SpeechRecognizerSetup.defaultSetup()
+                .setAcousticModel(new File(assetsDir, "en-us-ptm"))
+                .setDictionary(new File(assetsDir, "cmudict-en-us.dict"))
+                .getRecognizer();
+        recognizer.addListener(this);
+
+
+        // Create keyword-activation search.
+        recognizer.addKeyphraseSearch(KWS_SEARCH, KEYPHRASE);
+
+    }
+
+    private void switchSearch(String searchName) {
+        recognizer.stop();
+
+        recognizer.startListening(KWS_SEARCH);
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == PERMISSIONS_REQUEST_RECORD_AUDIO) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Recognizer initialization is a time-consuming and it involves IO,
+                // so we execute it in async task
+                new SetupTask(this).execute();
+            } else {
+                finish();
+            }
+        }
     }
 
     @Override

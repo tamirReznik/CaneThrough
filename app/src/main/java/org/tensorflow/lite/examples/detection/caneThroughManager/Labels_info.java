@@ -12,7 +12,8 @@ public interface Labels_info {
     }};
     Map<String, Float> objectHeight = new HashMap<String, Float>() {{
         put(Labels_Keys.PERSON, 1750f);
-        put(Labels_Keys.PERSON_FACE, 250f);
+//        put(Labels_Keys.PERSON_FACE, 1750f);
+        put(Labels_Keys.PERSON_FACE, 200f);
         put(Labels_Keys.BED, 1750f);
         put(Labels_Keys.TABLE, 1750f);
         put(Labels_Keys.CAR, 1750f);

@@ -23,9 +23,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -40,15 +42,15 @@ public class ObjectsManager {
     }
 
     public static final int ObjectManager_SIZE = 3;
+    public static final int LANDSCAPE_FRAME_ANGLE_DEGREE = 18;
 
-
-    private static int azimuthIndex = -1;
+    private static AtomicInteger azimuthIndex;
     private static ObjectsManager instance;
     private final Handler handler;
     private final Context context;
     //    ArrayList<AtomicReference<MyDetectedObject>> atomicLiveObjects;
-    HashSet<MyAtomicRef> atomicLiveObjects;
-    //HashMap<Integer,MyAtomicRef>atomicLiveObjects;
+    // HashSet<MyAtomicRef> atomicLiveObjects;
+    HashMap<Integer, HashSet<MyAtomicRef>> atomicLiveObjects;
     private Float focalLength;
     private Float heightSensor, widthSensor;
     private Float imageHeight, imageWidth;
@@ -61,11 +63,13 @@ public class ObjectsManager {
 
     private ObjectsManager(Context context, String cameraId) {
 
-        atomicLiveObjects = new HashSet<>();
+        // atomicLiveObjects = new HashSet<>();
+        atomicLiveObjects = new HashMap<>();
         alerted = new boolean[ObjectManager_SIZE];
         handler = new Handler(Looper.myLooper());
 
-        azimuthIndex = 0;
+        azimuthIndex = new AtomicInteger(-1);
+
         this.context = context.getApplicationContext();
 
         initVoiceAlerts();
@@ -130,6 +134,7 @@ public class ObjectsManager {
 
         assert focalL != null;
         focalLength = focalL[focalL.length - 1];
+        Log.i("heightSensor", "initCameraParam: " + heightSensor + " size of focal: " + focalL.length);
 
     }
 
@@ -144,11 +149,13 @@ public class ObjectsManager {
         return (int) result;
     }
 
-    private int distanceCalc(Detector.Recognition tmpObj) {
+    private double distanceCalc(Detector.Recognition tmpObj) {
 //todo - check ratio between height and width for person
 
-        float realHeight = Labels_info.objectHeight.get(tmpObj.getTitle()), pixHeight = tmpObj.getLocation().height();
-        if (Labels_Keys.PERSON.equals(tmpObj.getTitle()) && tmpObj.getLocation().height() / tmpObj.getLocation().width() > 2) {
+        float realHeight = Labels_info.objectHeight.get(tmpObj.getTitle());
+        float pixHeight = tmpObj.getLocation().height();
+
+        if (Labels_Keys.PERSON.equals(tmpObj.getTitle()) && pixHeight / tmpObj.getLocation().width() > 2) {
             realHeight = Labels_info.objectHeight.get(Labels_Keys.PERSON_FACE);
         }
 
@@ -157,8 +164,97 @@ public class ObjectsManager {
 //        return distance in meter's
         float result = (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) / 1000;
         Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight + " pixW:" + tmpObj.getLocation().width());
-        return (int) result;
+        return result;
 
+    }
+
+    private void alertCalculation() {
+        int currentIndex = azimuthIndex.get();
+        if (atomicLiveObjects.get(currentIndex) == null || Objects.requireNonNull(atomicLiveObjects.get(currentIndex)).isEmpty()) {
+            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
+            return;
+        }
+        ArrayList<MyDetectedObject> myDetectedObjects = atomicLiveObjects.get(currentIndex).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
+
+        MyDetectedObject myObj;
+        StringBuilder alert = new StringBuilder();
+        for (int i = 0; i < myDetectedObjects.size(); i++) {
+
+            if (myDetectedObjects.get(i) == null) {
+                continue;
+            }
+
+            if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
+                Detector.Recognition tmpObj = myObj.getLiveObject();
+
+                alert.append(tmpObj.getTitle()).append(" ").append((int) distanceCalc(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
+
+                myObj.setAlerted(true);
+                myDetectedObjects.set(i, myObj);
+            }
+        }
+        textToSpeech.speak(alert.toString());
+        atomicLiveObjects.put(currentIndex, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
+        long currentTime = System.nanoTime();
+        long elapsedTime = currentTime - lastAlert;
+        Log.i("ptttTime", "run: " + TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS));
+        lastAlert = currentTime;
+    }
+
+    /*
+    * update motors to work according to distance and position
+    * motorsRate[0] -> contains Left object distance from camera - update left motor
+    * motorsRate[1] -> contains Center object distance from camera - update Center motor
+    * motorsRate[2] -> contains Right object distance from camera - update Right motor
+    * */
+    private void updateVibrateMotors() {
+        int currentIndex = azimuthIndex.get();
+        if (atomicLiveObjects.get(currentIndex) == null || Objects.requireNonNull(atomicLiveObjects.get(currentIndex)).isEmpty()) {
+            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
+            return;
+        }
+        int[] motorsRate = {100, 100, 100};
+        int distanceLevel = Integer.MAX_VALUE;
+        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentIndex)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
+        for (MyDetectedObject obj : myDetectedObjects) {
+            distanceLevel = (int) (2 * distanceCalc(obj.getLiveObject()));
+            if (obj.getPos() == Position.LEFT) {
+                motorsRate[0] = Math.min(motorsRate[0], distanceLevel);
+            }
+            if (obj.getPos() == Position.CENTER) {
+                motorsRate[1] = Math.min(motorsRate[0], distanceLevel);
+            }
+            if (obj.getPos() == Position.RIGHT) {
+                motorsRate[2] = Math.min(motorsRate[0], distanceLevel);
+            }
+
+        }
+        // send array to motors
+    }
+
+    public void initiatedAlert() {
+        int currentIndex = azimuthIndex.get();
+        if (atomicLiveObjects.get(currentIndex) == null || Objects.requireNonNull(atomicLiveObjects.get(currentIndex)).isEmpty()) {
+            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
+            return;
+        }
+        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentIndex)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
+
+        MyDetectedObject myObj;
+        StringBuilder alert = new StringBuilder();
+        for (int i = 0; i < myDetectedObjects.size(); i++) {
+
+            if (myDetectedObjects.get(i) == null) {
+                continue;
+            }
+            myObj = myDetectedObjects.get(i);
+            Detector.Recognition tmpObj = myObj.getLiveObject();
+            alert.append(tmpObj.getTitle()).append(" ").append( /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
+                tmpObj.getLocation().height())*/(int) distanceCalc(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
+
+
+        }
+        textToSpeech.speak(alert.toString());
     }
 
     private void initAlertRunnable() {
@@ -167,35 +263,7 @@ public class ObjectsManager {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-
-                ArrayList<MyDetectedObject> myDetectedObjects = atomicLiveObjects.stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
-
-                MyDetectedObject myObj;
-                StringBuilder alert = new StringBuilder();
-                for (int i = 0; i < myDetectedObjects.size(); i++) {
-
-                    if (myDetectedObjects.get(i) == null) {
-                        continue;
-                    }
-
-                    if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
-                        Detector.Recognition tmpObj = myObj.getLiveObject();
-                        if (/*tmpObj.getTitle().equals(Labels_Keys.PERSON)||*/ Labels_info.objectHeight.containsKey(tmpObj.getTitle())) {
-                            alert.append(tmpObj.getTitle()).append(" ").append( /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalc(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
-
-//                             playAlert(tmpObj);
-                        }
-                        myObj.setAlerted(true);
-                        myDetectedObjects.set(i, myObj);
-                    }
-                }
-                textToSpeech.speak(alert.toString());
-                atomicLiveObjects.addAll(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
-                long currentTime = System.nanoTime();
-                long elapsedTime = currentTime - lastAlert;
-                Log.i("ptttTime", "run: " + TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS));
-                lastAlert = currentTime;
+                alertCalculation();
             }
         }, 0, 3010);
 
@@ -315,6 +383,12 @@ public class ObjectsManager {
     }
 
     public void addObjects(HashSet<MyDetectedObject> objCollection) {
+        int currentIndex = azimuthIndex.get();
+        Log.i("ptttAzimuth", "addObjects: " + currentIndex);
+        HashSet<MyAtomicRef> currentLiveObjects = atomicLiveObjects.get(currentIndex);
+        if (currentLiveObjects == null) {
+            currentLiveObjects = new HashSet<>();
+        }
 
         Log.i("ptttaddObjectsSet", "addObjects: hashset: " + objCollection.toString());
         if (objCollection.isEmpty()) {
@@ -324,21 +398,20 @@ public class ObjectsManager {
         ArrayList<MyDetectedObject> list = new ArrayList<>(objCollection);
         Log.i("ptttalertequalEB", "addObjects:" + list);
 
-        if (atomicLiveObjects.isEmpty()) {
+        if (currentLiveObjects.isEmpty()) {
             Log.i("ptttaddObjects", "isEmpty: ");
-            atomicLiveObjects.addAll(list.stream().map(MyAtomicRef::new)
+            currentLiveObjects.addAll(list.stream().map(MyAtomicRef::new)
                     .collect(Collectors.toList()));
-                  /* .map(obj -> new MyAtomicRef(new MyDetectedObject(obj, false, getPos(obj))))
-                    .collect(Collectors.toList()));*/
+            atomicLiveObjects.put(currentIndex, currentLiveObjects);
             return;
         }
 
 
-        if (atomicLiveObjects.size() < ObjectManager_SIZE) {
+        if (currentLiveObjects.size() < ObjectManager_SIZE) {
 
-            int limit = Math.min(ObjectManager_SIZE - atomicLiveObjects.size(), list.size());
+            int limit = Math.min(ObjectManager_SIZE - currentLiveObjects.size(), list.size());
 
-            atomicLiveObjects
+            currentLiveObjects
                     .addAll(list.stream().limit(limit).map(MyAtomicRef::new).collect(Collectors.toList()));
                           /*  .map(recognition -> new MyDetectedObject(recognition, false, getPos(recognition)))
                             .collect(Collectors.toList()));
@@ -346,8 +419,8 @@ public class ObjectsManager {
             list.removeAll(list.subList(0, limit));
 
         }
-        Log.i("ptttalertequalEA", "addObjects:" + atomicLiveObjects);
-        ArrayList<MyDetectedObject> aliveObjects = atomicLiveObjects.stream()
+        Log.i("ptttalertequalEA", "addObjects:" + currentLiveObjects);
+        ArrayList<MyDetectedObject> aliveObjects = currentLiveObjects.stream()
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
@@ -390,14 +463,19 @@ public class ObjectsManager {
         }
 
 
-        atomicLiveObjects.clear();
-        atomicLiveObjects.addAll(aliveObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList()));
-
-        Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(atomicLiveObjects.toArray()));
+        currentLiveObjects.clear();
+        currentLiveObjects.addAll(aliveObjects.stream()
+                .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.getTimeStamp(), TimeUnit.NANOSECONDS) < 16)
+                .map(MyAtomicRef::new).collect(Collectors.toList()));
+        atomicLiveObjects.put(currentIndex, currentLiveObjects);
+        Log.i("ptttMap", "addObjects: aft atomiclist");
+        Log.i("ptttMap", "addObjects: aft atomiclist" + atomicLiveObjects.toString());
+        Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(currentLiveObjects.toArray()));
     }
 
     public static void setAzimuthIndex(int azimuthIndex) {
-        ObjectsManager.azimuthIndex = azimuthIndex;
+        if (ObjectsManager.azimuthIndex != null)
+            ObjectsManager.azimuthIndex.set(azimuthIndex);
     }
 }
 

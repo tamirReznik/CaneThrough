@@ -39,9 +39,9 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.appcompat:appcompat:1.2.0'
 
     // Build off of nightly TensorFlow Lite
-    implementation('org.tensorflow:tensorflow-lite:0.0.0-nightly') { changing = true }
+    implementation('org.tensorflow:tensorflow-lite:2.3.0') { changing = true }
     implementation ('org.tensorflow:tensorflow-lite-metadata:0.0.0-nightly') { changing = true }
  }

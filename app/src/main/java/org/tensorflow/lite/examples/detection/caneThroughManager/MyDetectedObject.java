@@ -20,10 +20,15 @@ public class MyDetectedObject {
     private boolean alerted;
     private ObjectsManager.Position pos;
 
+
+
+    private long timeStamp;
+
     public MyDetectedObject(Detector.Recognition liveObject, boolean alerted, ObjectsManager.Position pos) {
         this.liveObject = liveObject;
         this.alerted = alerted;
         this.pos = pos;
+        timeStamp = System.nanoTime();
     }
 
     public ObjectsManager.Position getPos() {
@@ -69,5 +74,9 @@ public class MyDetectedObject {
             return false;
 
         return this.hashCode() == obj.hashCode();
+    }
+
+    public long getTimeStamp() {
+        return timeStamp;
     }
 }
