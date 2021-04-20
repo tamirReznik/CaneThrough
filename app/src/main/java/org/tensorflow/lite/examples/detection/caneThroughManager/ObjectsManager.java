@@ -152,7 +152,6 @@ public class ObjectsManager {
 
         pixHeight = detectedObject.getLocation().height();
 
-//        return distance in meter's
         float result = (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) / 1000;
         Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight + " pixW:" + detectedObject.getLocation().width());
         return result;
@@ -201,22 +200,22 @@ public class ObjectsManager {
             return;
         }
         int[] motorsRate = {MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL};
-        int distanceLevel = Integer.MAX_VALUE;
+        int distanceLevel;
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
                 .stream().map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
         for (MyDetectedObject obj : myDetectedObjects) {
             distanceLevel = (int) (2 * distanceCalc(obj.getLiveObject()));
-            if (obj.getPos() == Position.LEFT) {
+
+            if (obj.getPos() == Position.LEFT)
                 motorsRate[0] = Math.min(motorsRate[0], distanceLevel);
-            }
-            if (obj.getPos() == Position.CENTER) {
+
+            if (obj.getPos() == Position.CENTER)
                 motorsRate[1] = Math.min(motorsRate[0], distanceLevel);
-            }
-            if (obj.getPos() == Position.RIGHT) {
+
+            if (obj.getPos() == Position.RIGHT)
                 motorsRate[2] = Math.min(motorsRate[0], distanceLevel);
-            }
 
         }
         // send array to motors
@@ -228,7 +227,10 @@ public class ObjectsManager {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
             return;
         }
-        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
+
+        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
+                .stream().map(AtomicReference::get)
+                .collect(Collectors.toCollection(ArrayList::new));
 
         MyDetectedObject myObj;
         StringBuilder alert = new StringBuilder();
@@ -388,14 +390,12 @@ public class ObjectsManager {
         Arrays.fill(addNew, Boolean.TRUE);
         MyDetectedObject aliveObj, newObj;
         for (int i = 0; i < aliveObjects.size(); i++) {
-            Log.i("ptttaddObjects", "addObjects: index: " + i);
             aliveObj = aliveObjects.get(i);
+
             for (int j = 0; j < list.size(); j++) {
                 newObj = list.get(j);
 
-                Log.i("ptttaddObjects", "addObjects: obj:" + aliveObj);
                 if (aliveObj.equals(newObj)) {
-                    Log.i("ptttaddObjects", "addnewObjects: " + aliveObj);
                     newObj.setAlerted(true);
                     aliveObjects.set(i, newObj);
                     keepOld[i] = true;
@@ -422,9 +422,6 @@ public class ObjectsManager {
                 .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.getTimeStamp(), TimeUnit.NANOSECONDS) < 16)
                 .map(MyAtomicRef::new).collect(Collectors.toList()));
         atomicLiveObjects.put(currentKey, currentLiveObjects);
-        Log.i("ptttMap", "addObjects: aft atomiclist");
-        Log.i("ptttMap", "addObjects: aft atomiclist" + atomicLiveObjects.toString());
-        Log.i("pttt", "addObjects: aft atomiclist" + Arrays.toString(currentLiveObjects.toArray()));
     }
 
     public static void setAzimuthIndex(int azimuthIndex) {

@@ -39,6 +39,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.PowerManager;
 import android.os.Trace;
 import android.util.Log;
 import android.util.Size;
@@ -105,15 +106,19 @@ public abstract class CameraActivity extends AppCompatActivity
 
     // sensors
     private static SensorManager sensorManager;
-    private Sensor magnetSensor, accelerometerSensor, rotationVectorSensor;
-    private boolean magnetExist, accelerometerExist, rotationVectorExist;
+    private Sensor magnetSensor, accelerometerSensor, rotationVectorSensor, proximitySensor;
+    private boolean magnetExist, accelerometerExist, rotationVectorExist, proximityExist;
     private boolean lastAccelerometerSet = false, lastMagnetometerSet = false;
-    private SensorEventListener sensorAzimuthEventListener;
+    private SensorEventListener sensorEventListener;
     float azimuth, pitch, roll;
     private float[] rMat = new float[9];
     private float[] orientation = new float[9];
     private float[] lastAccelerometer = new float[3];
     private float[] lastMagnetometer = new float[3];
+
+    private PowerManager powerManager;
+    private PowerManager.WakeLock wakeLock;
+    private int field = 0x00000020;
 
 
     @Override
@@ -131,6 +136,13 @@ public abstract class CameraActivity extends AppCompatActivity
         Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
 
         //Todo - CaneThrough
+        try {
+            // Yeah, this is hidden field.
+            field = PowerManager.class.getField("PROXIMITY_SCREEN_OFF_WAKE_LOCK").getInt(null);
+        } catch (Throwable ignored) {
+        }
+        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(field, getLocalClassName());
         getSupportActionBar().hide();
         InitSensors();
 
@@ -206,43 +218,55 @@ public abstract class CameraActivity extends AppCompatActivity
         minusImageView.setOnClickListener(this);
     }
 
+    private void checkProximitySensor(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_PROXIMITY) {
+            if (event.values[0] < 1 && !wakeLock.isHeld())
+                wakeLock.acquire(10 * 60 * 1000L /*10 minutes*/);
+            else if (wakeLock.isHeld())
+                wakeLock.release();
+        }
+    }
+
+    private void checkPitchAndAzimuthSensors(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rMat, event.values);
+            azimuth = (int) (Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360;
+        } else if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            System.arraycopy(event.values, 0, lastAccelerometer, 0, event.values.length);
+            Log.i("TYPE_ACCELEROMETER", "onSensorChanged: " + Arrays.toString(lastAccelerometer) + "\n");
+            pitch = event.values[2];
+            lastAccelerometerSet = true;
+        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            System.arraycopy(event.values, 0, magnetSensor, 0, event.values.length);
+            lastMagnetometerSet = true;
+        }
+
+        if (lastMagnetometerSet && lastAccelerometerSet) {
+            SensorManager.getRotationMatrix(rMat, null, lastAccelerometer, lastMagnetometer);
+            SensorManager.getOrientation(rMat, orientation);
+            azimuth = (int) ((Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360);
+        }
+
+
+        azimuth = Math.round(azimuth);
+        pitch = Math.round(pitch);
+    }
 
     private void InitSensors() {
-        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        startSensors();
-        magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-        sensorAzimuthEventListener = new SensorEventListener() {
+        startSensors();
+
+        sensorEventListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
-                    SensorManager.getRotationMatrixFromVector(rMat, event.values);
-                    azimuth = (int) (Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360;
-                } else if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-                    System.arraycopy(event.values, 0, lastAccelerometer, 0, event.values.length);
-                    Log.i("TYPE_ACCELEROMETER", "onSensorChanged: " + Arrays.toString(lastAccelerometer) + "\n");
-                    pitch = event.values[2];
-                    lastAccelerometerSet = true;
 
-                } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-                    System.arraycopy(event.values, 0, magnetSensor, 0, event.values.length);
-                    lastMagnetometerSet = true;
-                }
-
-                if (lastMagnetometerSet && lastAccelerometerSet) {
-                    SensorManager.getRotationMatrix(rMat, null, lastAccelerometer, lastMagnetometer);
-                    SensorManager.getOrientation(rMat, orientation);
-                    azimuth = (int) ((Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360);
-                }
-
-                azimuth = Math.round(azimuth);
-                pitch = Math.round(pitch);
+                checkProximitySensor(event);
+                checkPitchAndAzimuthSensors(event);
 
                 if (ObjectsManager.getInstance() != null) {
                     ObjectsManager.setAzimuthIndex((int) azimuth / ObjectsManager.LANDSCAPE_FRAME_ANGLE_DEGREE);
-                    ObjectsManager.setPitchIndex((int) (pitch  / ObjectsManager.PITCH_FRAME_ANGLE_DEGREE) + 2);
+                    ObjectsManager.setPitchIndex((int) (pitch / ObjectsManager.PITCH_FRAME_ANGLE_DEGREE) + 2);
                 }
-
             }
 
             @Override
@@ -265,6 +289,13 @@ public abstract class CameraActivity extends AppCompatActivity
     }
 
     void startSensors() {
+
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+
+        if ((proximitySensor = sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY)) != null)
+            proximityExist = sensorManager.registerListener(sensorEventListener, proximitySensor, SensorManager.SENSOR_DELAY_NORMAL);
+
+
         if (sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) == null) {
             if (sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) == null
                     || sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) == null) {
@@ -273,25 +304,29 @@ public abstract class CameraActivity extends AppCompatActivity
                 accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
                 magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-                magnetExist = sensorManager.registerListener(sensorAzimuthEventListener, magnetSensor, SensorManager.SENSOR_DELAY_NORMAL);
-                accelerometerExist = sensorManager.registerListener(sensorAzimuthEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                accelerometerExist = sensorManager.registerListener(sensorEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                magnetExist = sensorManager.registerListener(sensorEventListener, magnetSensor, SensorManager.SENSOR_DELAY_NORMAL);
+
             }
         } else {
             rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-            rotationVectorExist = sensorManager.registerListener(sensorAzimuthEventListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            rotationVectorExist = sensorManager.registerListener(sensorEventListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
             if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
                 accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-                accelerometerExist = sensorManager.registerListener(sensorAzimuthEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                accelerometerExist = sensorManager.registerListener(sensorEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
             }
         }
     }
 
     public void stopSensors() {
-        if (rotationVectorExist) {
-            sensorManager.unregisterListener(sensorAzimuthEventListener, rotationVectorSensor);
-        } else if (accelerometerExist && magnetExist) {
-            sensorManager.unregisterListener(sensorAzimuthEventListener, magnetSensor);
-            sensorManager.unregisterListener(sensorAzimuthEventListener, accelerometerSensor);
+        if (proximityExist)
+            sensorManager.unregisterListener(sensorEventListener, proximitySensor);
+
+        if (rotationVectorExist)
+            sensorManager.unregisterListener(sensorEventListener, rotationVectorSensor);
+        else if (accelerometerExist && magnetExist) {
+            sensorManager.unregisterListener(sensorEventListener, magnetSensor);
+            sensorManager.unregisterListener(sensorEventListener, accelerometerSensor);
         }
     }
 
