@@ -193,7 +193,7 @@ public class ObjectsManager {
 
             if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
                 Detector.Recognition tmpObj = myObj.getLiveObject();
-                alert.append(tmpObj.getTitle()).append(" ").append((int) distanceCalcViaHeight(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
+                alert.append(tmpObj.getTitle()).append(" ").append((int) distanceCalcViaWidth(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
                 myObj.setAlerted(true);
                 myDetectedObjects.set(i, myObj);
             }
@@ -263,7 +263,7 @@ public class ObjectsManager {
             alert
                     .append(tmpObj.getTitle())
                     .append(" ")
-                    .append((int) distanceCalcViaHeight(tmpObj))
+                    .append((int) distanceCalcViaWidth(tmpObj))
                     .append("meter ")
                     .append(getPos(tmpObj))
                     .append(" ");
