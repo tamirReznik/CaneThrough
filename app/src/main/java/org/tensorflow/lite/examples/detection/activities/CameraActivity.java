@@ -55,8 +55,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
@@ -67,10 +65,8 @@ import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Objects;
-
-import edu.cmu.pocketsphinx.SpeechRecognizer;
 
 public abstract class CameraActivity extends AppCompatActivity
         implements OnImageAvailableListener,
@@ -112,33 +108,13 @@ public abstract class CameraActivity extends AppCompatActivity
     private Sensor magnetSensor, accelerometerSensor, rotationVectorSensor;
     private boolean magnetExist, accelerometerExist, rotationVectorExist;
     private boolean lastAccelerometerSet = false, lastMagnetometerSet = false;
-    private SensorEventListener sensorEventListener;
+    private SensorEventListener sensorAzimuthEventListener;
     float azimuth, pitch, roll;
     private float[] rMat = new float[9];
     private float[] orientation = new float[9];
     private float[] lastAccelerometer = new float[3];
     private float[] lastMagnetometer = new float[3];
 
-    // voice command
-    private static final String KWS_SEARCH = "wakeup";
-    private static final String KEYPHRASE = "cane through";
-    private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
-    private SpeechRecognizer recognizer;
-    private HashMap<String, Integer> captions;
-
-//    public void initVoiceCommand() {
-//        captions = new HashMap<>();
-//        captions.put(KWS_SEARCH, R.string.kws_caption);
-//
-//        int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO);
-//        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-//            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSIONS_REQUEST_RECORD_AUDIO);
-//            return;
-//        }
-//        // Recognizer initialization is a time-consuming and it involves IO,
-//        // so we execute it in async task
-//        new SetupTask(this).execute();
-//    }
 
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
@@ -156,7 +132,6 @@ public abstract class CameraActivity extends AppCompatActivity
 
         //Todo - CaneThrough
         getSupportActionBar().hide();
-       // initVoiceCommand();
         InitSensors();
 
 
@@ -236,16 +211,19 @@ public abstract class CameraActivity extends AppCompatActivity
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         startSensors();
         magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        sensorEventListener = new SensorEventListener() {
+
+        sensorAzimuthEventListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
                 if (event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
                     SensorManager.getRotationMatrixFromVector(rMat, event.values);
                     azimuth = (int) (Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360;
-                }
-                if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                } else if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
                     System.arraycopy(event.values, 0, lastAccelerometer, 0, event.values.length);
+                    Log.i("TYPE_ACCELEROMETER", "onSensorChanged: " + Arrays.toString(lastAccelerometer) + "\n");
+                    pitch = event.values[2];
                     lastAccelerometerSet = true;
+
                 } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
                     System.arraycopy(event.values, 0, magnetSensor, 0, event.values.length);
                     lastMagnetometerSet = true;
@@ -257,15 +235,14 @@ public abstract class CameraActivity extends AppCompatActivity
                     azimuth = (int) ((Math.toDegrees(SensorManager.getOrientation(rMat, orientation)[0]) + 360) % 360);
                 }
 
-
                 azimuth = Math.round(azimuth);
+                pitch = Math.round(pitch);
 
                 if (ObjectsManager.getInstance() != null) {
                     ObjectsManager.setAzimuthIndex((int) azimuth / ObjectsManager.LANDSCAPE_FRAME_ANGLE_DEGREE);
+                    ObjectsManager.setPitchIndex((int) (pitch  / ObjectsManager.PITCH_FRAME_ANGLE_DEGREE) + 2);
                 }
 
-                double tesla = Math.sqrt((azimuth * azimuth) + (pitch * pitch) + (roll * roll));
-                // Log.i("ptttAzimuth", "onSensorChanged: " + azimuth);
             }
 
             @Override
@@ -296,21 +273,25 @@ public abstract class CameraActivity extends AppCompatActivity
                 accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
                 magnetSensor = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
-                magnetExist = sensorManager.registerListener(sensorEventListener, magnetSensor, SensorManager.SENSOR_DELAY_NORMAL);
-                accelerometerExist = sensorManager.registerListener(sensorEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                magnetExist = sensorManager.registerListener(sensorAzimuthEventListener, magnetSensor, SensorManager.SENSOR_DELAY_NORMAL);
+                accelerometerExist = sensorManager.registerListener(sensorAzimuthEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
             }
         } else {
             rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
-            rotationVectorExist = sensorManager.registerListener(sensorEventListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            rotationVectorExist = sensorManager.registerListener(sensorAzimuthEventListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
+                accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+                accelerometerExist = sensorManager.registerListener(sensorAzimuthEventListener, accelerometerSensor, SensorManager.SENSOR_DELAY_NORMAL);
+            }
         }
     }
 
     public void stopSensors() {
         if (rotationVectorExist) {
-            sensorManager.unregisterListener(sensorEventListener, rotationVectorSensor);
+            sensorManager.unregisterListener(sensorAzimuthEventListener, rotationVectorSensor);
         } else if (accelerometerExist && magnetExist) {
-            sensorManager.unregisterListener(sensorEventListener, magnetSensor);
-            sensorManager.unregisterListener(sensorEventListener, accelerometerSensor);
+            sensorManager.unregisterListener(sensorAzimuthEventListener, magnetSensor);
+            sensorManager.unregisterListener(sensorAzimuthEventListener, accelerometerSensor);
         }
     }
 
@@ -486,10 +467,6 @@ public abstract class CameraActivity extends AppCompatActivity
     public synchronized void onDestroy() {
         LOGGER.d("onDestroy " + this);
         super.onDestroy();
-//        if (recognizer != null) {
-//            recognizer.cancel();
-//            recognizer.shutdown();
-//        }
     }
 
     protected synchronized void runInBackground(final Runnable r) {
@@ -509,15 +486,6 @@ public abstract class CameraActivity extends AppCompatActivity
                 requestPermission();
             }
         }
-//        if (requestCode == PERMISSIONS_REQUEST_RECORD_AUDIO) {
-//            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-//                // Recognizer initialization is a time-consuming and it involves IO,
-//                // so we execute it in async task
-//                new SetupTask(this).execute();
-//            } else {
-//                finish();
-//            }
-//        }
     }
 
     private static boolean allPermissionsGranted(final int[] grantResults) {
@@ -694,114 +662,6 @@ public abstract class CameraActivity extends AppCompatActivity
             setNumThreads(numThreads);
         }
     }
-
-//    @Override
-//    public void onResult(Hypothesis hypothesis) {
-//        Log.i("ptttVoiceCmd", "onResult: wake up voice commandBEFORE ");
-//        if (hypothesis != null) {
-//            String text = hypothesis.getHypstr();
-//            makeText(getApplicationContext(), text, Toast.LENGTH_LONG).show();
-//            Log.i("ptttVoiceCmd", "onResult: wake up voice command");
-////            ObjectsManager om = ObjectsManager.getInstance();
-////            if (om != null) {
-////                om.initiatedAlert();
-////            }
-//        }
-//    }
-//
-//    @Override
-//    public void onBeginningOfSpeech() {
-//    }
-//
-//    /**
-//     * We stop recognizer here to get a final result
-//     */
-//    @Override
-//    public void onEndOfSpeech() {
-//        if (!recognizer.getSearchName().equals(KWS_SEARCH))
-//            switchSearch(KWS_SEARCH);
-//    }
-//
-//    /**
-//     * In partial result we get quick updates about current hypothesis. In
-//     * keyword spotting mode we can react here, in other modes we need to wait
-//     * for final result in onResult.
-//     */
-//    @Override
-//    public void onPartialResult(Hypothesis hypothesis) {
-//        if (hypothesis == null)
-//            return;
-//
-//        String text = hypothesis.getHypstr();
-//        if (text.equals(KEYPHRASE))
-//            switchSearch("MENU_SEARCH");
-//    }
-//
-//    private static class SetupTask extends AsyncTask<Void, Void, Exception> {
-//        WeakReference<CameraActivity> activityReference;
-//
-//        SetupTask(CameraActivity activity) {
-//            this.activityReference = new WeakReference<>(activity);
-//        }
-//
-//        @Override
-//        protected Exception doInBackground(Void... params) {
-//            try {
-//                Assets assets = new Assets(activityReference.get());
-//                File assetDir = assets.syncAssets();
-//                activityReference.get().setupRecognizer(assetDir);
-//            } catch (IOException e) {
-//                return e;
-//            }
-//            return null;
-//        }
-//
-//        @Override
-//        protected void onPostExecute(Exception result) {
-//            if (result != null) {
-////                ((TextView) activityReference.get().findViewById(R.id.caption_text))
-////                        .setText("Failed to init recognizer " + result);
-//            } else {
-//                activityReference.get().switchSearch(KWS_SEARCH);
-//            }
-//        }
-//    }
-//
-//    @Override
-//    public void onError(Exception error) {
-//        Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
-//    }
-//
-//    @Override
-//    public void onTimeout() {
-//        switchSearch(KWS_SEARCH);
-//    }
-//
-//    private void setupRecognizer(File assetsDir) throws IOException {
-//        // The recognizer can be configured to perform multiple searches
-//        // of different kind and switch between them
-//
-//        recognizer = SpeechRecognizerSetup.defaultSetup()
-//                .setAcousticModel(new File(assetsDir, "en-us-ptm"))
-//                .setDictionary(new File(assetsDir, "cmudict-en-us.dict"))
-//                .getRecognizer();
-//        recognizer.addListener(this);
-//
-//
-//        // Create keyword-activation search.
-//        recognizer.addKeyphraseSearch(KWS_SEARCH, KEYPHRASE);
-//
-//    }
-//
-//    private void switchSearch(String searchName) {
-//        recognizer.stop();
-//
-//        // If we are not spotting, start listening with timeout (10000 ms or 10 seconds).
-//        //  if (searchName.equals(KWS_SEARCH))
-//        if (searchName.equals(KWS_SEARCH))
-//            recognizer.startListening(KWS_SEARCH);
-//
-//    }
 
     protected void showFrameInfo(String frameInfo) {
         frameValueTextView.setText(frameInfo);
