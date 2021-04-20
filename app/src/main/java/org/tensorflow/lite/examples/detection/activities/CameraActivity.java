@@ -135,17 +135,11 @@ public abstract class CameraActivity extends AppCompatActivity
         setSupportActionBar(toolbar);
         Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
 
-        //Todo - CaneThrough
-        try {
-            // Yeah, this is hidden field.
-            field = PowerManager.class.getField("PROXIMITY_SCREEN_OFF_WAKE_LOCK").getInt(null);
-        } catch (Throwable ignored) {
-        }
-        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-        wakeLock = powerManager.newWakeLock(field, getLocalClassName());
+        //CaneThrough
+        initProximityScreenLock();
         getSupportActionBar().hide();
         InitSensors();
-
+        //#
 
         if (hasPermission()) {
             setFragment();
@@ -216,6 +210,16 @@ public abstract class CameraActivity extends AppCompatActivity
 
         plusImageView.setOnClickListener(this);
         minusImageView.setOnClickListener(this);
+    }
+
+    private void initProximityScreenLock() {
+        try {
+            // Yeah, this is hidden field.
+            field = PowerManager.class.getField("PROXIMITY_SCREEN_OFF_WAKE_LOCK").getInt(null);
+        } catch (Throwable ignored) {
+        }
+        powerManager = (PowerManager) getSystemService(POWER_SERVICE);
+        wakeLock = powerManager.newWakeLock(field, getLocalClassName());
     }
 
     private void checkProximitySensor(SensorEvent event) {
