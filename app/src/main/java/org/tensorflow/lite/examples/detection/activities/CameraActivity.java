@@ -127,17 +127,16 @@ public abstract class CameraActivity extends AppCompatActivity
 
         LOGGER.d("onCreate " + this);
         super.onCreate(null);
-        //getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+//        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
 
         setContentView(R.layout.tfe_od_activity_camera);
-        Toolbar toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
-        Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
+//        Toolbar toolbar = findViewById(R.id.toolbar);
+//        setSupportActionBar(toolbar);
+//        Objects.requireNonNull(getSupportActionBar()).setDisplayShowTitleEnabled(false);
 
         //CaneThrough
         initProximityScreenLock();
-        getSupportActionBar().hide();
         InitSensors();
         //#
 
@@ -166,7 +165,7 @@ public abstract class CameraActivity extends AppCompatActivity
                         } else {
                             gestureLayout.getViewTreeObserver().removeOnGlobalLayoutListener(this);
                         }
-                        //                int width = bottomSheetLayout.getMeasuredWidth();
+                        //int width = bottomSheetLayout.getMeasuredWidth();
                         int height = gestureLayout.getMeasuredHeight();
 
                         sheetBehavior.setPeekHeight(height);

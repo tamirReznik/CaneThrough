@@ -50,7 +50,7 @@ public class ObjectsManager {
     HashMap<String, HashSet<MyAtomicRef>> atomicLiveObjects;
     private Float focalLength;
     private Float heightSensor, widthSensor;
-    private Float imageHeight, imageWidth;
+    private static Float imageHeight, imageWidth;
     private TTSManager textToSpeech;
     private Timer timer;
     private long lastAlert;
@@ -88,9 +88,9 @@ public class ObjectsManager {
 
     public static Position getPos(Detector.Recognition obj) {
 
-        if (obj.getLocation().centerX() <= 512) {
+        if (obj.getLocation().centerX() <= imageWidth / 3) {
             return Position.LEFT;
-        } else if (obj.getLocation().centerX() >= 1048) {
+        } else if (obj.getLocation().centerX() >= 2 * imageWidth / 3) {
             return Position.RIGHT;
         } else {
             return Position.CENTER;
@@ -154,6 +154,7 @@ public class ObjectsManager {
         return result;
 
     }
+
     /**
      * realHeight - object height in mm
      * pixHeight  - object height in pixel

@@ -269,29 +269,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                         final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
-//                        Log.i("pttt", "run: Thread id: " + Thread.currentThread().getId());
-//                        if (ObjectsManager.getInstance() != null) {
-//                            int indexCounter = 0;
-//                            HashSet<MyDetectedObject> detectionsSet = new HashSet<>();
-//                            while (indexCounter < results.size() && detectionsSet.size() < ObjectManager_SIZE) {
-//                                Detector.Recognition detectedObject = results.get(indexCounter);
-//                                RectF location = detectedObject.getLocation();
-//                                //cropToFrameTransform.mapRect(location);
-//                                detectedObject.setLocation(location);
-//                                if (detectedObject.getConfidence() > .65 && Labels_info.objectHeight.containsKey(detectedObject.getTitle())) {
-//
-//                                    MyDetectedObject tmpObj = new MyDetectedObject(detectedObject, false, getPos(detectedObject));
-//                                    detectionsSet.add(tmpObj);
-//                                    Log.i("ptttalertequal", "run: eaqual? : " + tmpObj + " position: " + tmpObj.getLiveObject().getLocation().centerX());
-//                                }
-//                                indexCounter++;
-//                            }
-//                            ObjectsManager.getInstance().addObjects(detectionsSet);
-////                            ObjectsManager.getInstance()
-////                                    .addObjects(results.subList(0, Math.min(ObjectManager_SIZE + 1, results.size()))
-////                                            .stream().filter(res -> res.getConfidence() > 0.65 && Labels_info.objectHeight.containsKey(res.getTitle()))
-////                                            .collect(Collectors.toList()));
-//                        }
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
                         final Canvas canvas = new Canvas(cropCopyBitmap);
                         final Paint paint = new Paint();
@@ -308,38 +285,11 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
                         HashSet<MyDetectedObject> detectionsSet = new HashSet<>();
-//                        for (int i = 0; i < results.size(); i++)
-//                            Log.i("TAGtest", "run: " + results.get(i).getLocation().left + " right: " + results.get(i).getLocation().right + "\n");
                         for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
                                 canvas.drawRect(location, paint);
-//                                if (result.getTitle().equals(Labels_Keys.MOUSE)) {
-//
-//
-//                                    float p = result.getLocation().right - result.getLocation().left;
-//                                    float d = (float) ((6.5 * 263.621) / p);
-//                                    float mouseDistance = getDistance(result);
-//                                    distanceCallBack.mouse(mouseDistance);
-//                                    my_distances.put("mouse", mouseDistance);
-//                                    my_distance = getDistance(result);
-////                                    soundAlert(result, mouseDistance);
-//
-//                                    if (Math.abs(mouseLastLocation - mouseDistance) > 100) {
-//                                        Utils.soundReport(result, mouseDistance);
-//                                    }
-//                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
-//
-//
-//                                } else if (result.getTitle().equals(Labels_Keys.PERSON)) {
-//                                    Log.d("pttt", "bottom: " + result.getLocation().bottom + ", top: " + result.getLocation().top + ", right: " + result.getLocation().right + ", left: " + result.getLocation().left);
-//                                    float personDistance = getDistance(result);
-//                                    distanceCallBack.person(personDistance);
-//                                    //my_distances.put("person",personDistance);
-//                                    //soundAlert(result, personDistance);
-//                                    if (Math.abs(personLastLocation - personDistance) > 100)
-//                                        Utils.soundReport(result, personDistance);
-//                                }
+
                                 cropToFrameTransform.mapRect(location);
                                 result.setLocation(location);
                                 mappedRecognitions.add(result);
@@ -487,12 +437,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
         @Override
         protected void onPostExecute(Exception result) {
-            if (result != null) {
-//                ((TextView) activityReference.get().findViewById(R.id.caption_text))
-//                        .setText("Failed to init recognizer " + result);
-            } else {
+            if (result == null)
                 activityReference.get().switchSearch(KWS_SEARCH);
-            }
         }
     }
 
@@ -560,44 +506,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                 });
     }
 
-//    void soundAlert(Detector.Recognition result, float d) {
-//        if (!mediaPlayer.isPlaying()) {
-//            mediaPlayer.setVolume((15.0f / d) * (1.0f - result.getLocation().centerX() / 300.0f), (15.0f / d) * (result.getLocation().centerX() / 300.0f));
-//            mediaPlayer.start();
-//        }
-//    }
-
-    void soundReport(Detector.Recognition result, float d) {
-        personLastLocation = d;
-        mouseLastLocation = d;
-        String[] side = {"on the left", "ahead", "on the right"};
-        String mySide = "";
-        if (result.getLocation().left < 100 && result.getLocation().right <= 150)
-            mySide = side[0];
-        else if (result.getLocation().right > 200 && result.getLocation().left >= 150)
-            mySide = side[2];
-        else
-            mySide = side[1];
-
-        d = d / 100;
-        int dd = (int) d;
-        String dis = String.format(Locale.getDefault(), "%d meters", dd);
-        //final Handler h =new Handler();
-        String finalMySide = mySide;
-        //Runnable r = new Runnable() {
-
-        //public void run() {
-
-        if (!textToSpeech.isSpeaking()) {
-            int speech = textToSpeech.speak("" + result.getTitle() + " " + dis + " " + finalMySide, TextToSpeech.QUEUE_FLUSH, null);
-        }
-
-        //  h.postDelayed(this, 5000);
-        //  }
-        //};
-
-        // h.postDelayed(r, 5000);
-    }
 
     public static void setDistanceCallBack(Distance_CallBack callBack) {
         distanceCallBack = callBack;

@@ -8,13 +8,7 @@ import org.tensorflow.lite.examples.detection.tflite.Detector;
 import java.util.Objects;
 
 public class MyDetectedObject {
-//
-//    enum Position {
-//        LEFT,
-//        CENTER,
-//        RIGHT,
-//        UNKNOWN
-//    }
+
 
     private Detector.Recognition liveObject;
     private boolean alerted;
