@@ -63,6 +63,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.tensorflow.lite.examples.detection.R;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.customview.AutoFitTextureView;
 import org.tensorflow.lite.examples.detection.env.Logger;
 
@@ -212,7 +213,7 @@ public class CameraConnectionFragment extends Fragment {
    */
   protected static Size chooseOptimalSize(final Size[] choices, final int width, final int height) {
     final int minSize = Math.max(Math.min(width, height), MINIMUM_PREVIEW_SIZE);
-    Log.i(Labels_Keys.CANE_THROUGH_LOG, "chooseOptimalSize: width: "+width+" height:"+height);
+    Log.i(Labels_info.CANE_THROUGH_LOG, "chooseOptimalSize: width: "+width+" height:"+height);
     final Size desiredSize = new Size(1920, 1080);
 
     // Collect the supported resolutions that are at least as big as the preview Surface

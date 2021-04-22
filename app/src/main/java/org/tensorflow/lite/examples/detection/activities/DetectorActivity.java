@@ -74,7 +74,6 @@ import edu.cmu.pocketsphinx.SpeechRecognizerSetup;
 
 import static android.widget.Toast.makeText;
 import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.ObjectManager_SIZE;
-import static org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager.getPos;
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -132,11 +131,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     private static final String KEYPHRASE = "cane through update";
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
     private SpeechRecognizer recognizer;
-    private HashMap<String, Integer> captions;
 
     public void initVoiceCommand() {
-        captions = new HashMap<>();
-        captions.put(KWS_SEARCH, R.string.kws_caption);
 
         int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO);
         if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
@@ -231,7 +227,6 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
         });
     }
 
-
     @Override
     protected void processImage() {
 
@@ -298,7 +293,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 if (objectsManager != null) {
                                     if (detectionsSet.size() < ObjectManager_SIZE) {
                                         if (Labels_info.objectHeight.containsKey(result.getTitle())) {
-                                            MyDetectedObject tmpObj = new MyDetectedObject(result, false, getPos(result));
+                                            MyDetectedObject tmpObj = new MyDetectedObject(result, false, objectsManager.getPos(result));
                                             detectionsSet.add(tmpObj);
                                         }
                                     } else if (!objectsAddedToObjectManager) {
@@ -309,6 +304,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                             }
                         }
+                        /*if objectsAddedToObjectManager == true -> objectsManager not null according to current implementation*/
                         if (!objectsAddedToObjectManager) {
                             objectsManager.addObjects(detectionsSet);
                         }

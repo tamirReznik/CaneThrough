@@ -11,8 +11,6 @@ import android.content.Context;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 import android.util.SizeF;
 
@@ -48,7 +46,6 @@ public class ObjectsManager {
 
     private static AtomicInteger azimuthIndex, pitchIndex;
     private static ObjectsManager instance;
-    private final Handler handler;
     private final Context context;
     HashMap<String, HashSet<MyAtomicRef>> atomicLiveObjects;
     private Float focalLength;
@@ -62,8 +59,6 @@ public class ObjectsManager {
 
         atomicLiveObjects = new HashMap<>();
 
-        handler = new Handler(Looper.myLooper());
-
         azimuthIndex = new AtomicInteger(-1);
         pitchIndex = new AtomicInteger(-1);
 
@@ -74,7 +69,6 @@ public class ObjectsManager {
         initCameraParam(cameraId);
 
         Log.i("CT_log", "ObjectsManager: focal" + focalLength + " height sensor: " + heightSensor + " width sensor: " + widthSensor);
-
 
     }
 
@@ -89,7 +83,7 @@ public class ObjectsManager {
         }
     }
 
-    public static Position getPos(Detector.Recognition obj) {
+    public Position getPos(Detector.Recognition obj) {
 
         if (obj.getLocation().centerX() <= imageWidth / 3) {
             return Position.LEFT;
@@ -128,7 +122,6 @@ public class ObjectsManager {
         imageHeight = 1080.0F;
         imageWidth = 1920.0F;
 
-
         assert focalL != null;
         focalLength = focalL[focalL.length - 1];
         Log.i("heightSensor", "initCameraParam: " + heightSensor + " size of focal: " + focalL.length);
@@ -142,18 +135,19 @@ public class ObjectsManager {
      * @param detectedObject - Detector.Recognition object to calculate distance from
      * @return - Estimated distance in meters
      */
+    //addObject method filter object that not exist in Labels_info.objectWidth keys
+    @SuppressWarnings("ConstantConditions")
     private double distanceCalcViaWidth(Detector.Recognition detectedObject) {
-//todo - check ratio between height and width for person
 
         float realWidth = Labels_info.objectWidth.get(detectedObject.getTitle());
         float pixWidth = detectedObject.getLocation().width();
 
-        if (Labels_Keys.PERSON.equals(detectedObject.getTitle()) && pixWidth / detectedObject.getLocation().width() > 2) {
-            realWidth = Labels_info.objectHeight.get(Labels_Keys.PERSON_FACE);
+        if (Labels_info.PERSON.equals(detectedObject.getTitle()) && pixWidth / detectedObject.getLocation().width() >= 2) {
+            realWidth = Labels_info.objectWidth.get(Labels_info.PERSON_FACE);
         }
 
         float result = (focalLength * realWidth * imageWidth) / (widthSensor * pixWidth) / 1000;
-        Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real width: " + realWidth + " imageW: " + imageWidth + " widthSensor: " + heightSensor + " pixH:" + pixWidth + " pixW:" + detectedObject.getLocation().width());
+        Log.i(Labels_info.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real width: " + realWidth + " imageW: " + imageWidth + " widthSensor: " + heightSensor + " pixH:" + pixWidth + " pixW:" + detectedObject.getLocation().width());
         return result;
 
     }
@@ -165,18 +159,20 @@ public class ObjectsManager {
      * @param detectedObject - Detector.Recognition object to calculate distance from
      * @return - Estimated distance in meters
      */
+    //addObject method filter object that not exist in Labels_info.objectHeight keys
+    @SuppressWarnings("ConstantConditions")
     private double distanceCalcViaHeight(Detector.Recognition detectedObject) {
-//todo - check ratio between height and width for person
+
 
         float realHeight = Labels_info.objectHeight.get(detectedObject.getTitle());
         float pixHeight = detectedObject.getLocation().height();
 
-        if (Labels_Keys.PERSON.equals(detectedObject.getTitle()) && pixHeight / detectedObject.getLocation().width() > 2) {
-            realHeight = Labels_info.objectHeight.get(Labels_Keys.PERSON_FACE);
+        if (Labels_info.PERSON.equals(detectedObject.getTitle()) && pixHeight / detectedObject.getLocation().width() > 2) {
+            realHeight = Labels_info.objectHeight.get(Labels_info.PERSON_FACE);
         }
 
         float result = (focalLength * realHeight * imageHeight) / (heightSensor * pixHeight) / 1000;
-        Log.i(Labels_Keys.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight + " pixW:" + detectedObject.getLocation().width());
+        Log.i(Labels_info.CANE_THROUGH_LOG, "distanceCalc: " + result + " focal:" + focalLength + " real height: " + realHeight + " imageH: " + imageHeight + " heightSensor: " + heightSensor + " pixH:" + pixHeight + " pixW:" + detectedObject.getLocation().width());
         return result;
 
     }
@@ -187,11 +183,13 @@ public class ObjectsManager {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
             return;
         }
+
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
 
-        MyDetectedObject myObj ;
+        MyDetectedObject myObj;
         StringBuilder alert = new StringBuilder();
         for (int i = 0; i < myDetectedObjects.size(); i++) {
+
             if (myDetectedObjects.get(i) == null)
                 continue;
 
@@ -244,37 +242,6 @@ public class ObjectsManager {
 
         }
         // send array to motors
-    }
-
-    public void initiatedAlert() {
-        String currentKey = getCurrentKey();
-        if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
-            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
-            return;
-        }
-
-        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
-                .stream().map(AtomicReference::get)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-        MyDetectedObject myObj;
-        StringBuilder alert = new StringBuilder();
-        for (int i = 0; i < myDetectedObjects.size(); i++) {
-
-            if (myDetectedObjects.get(i) == null) {
-                continue;
-            }
-            myObj = myDetectedObjects.get(i);
-            Detector.Recognition tmpObj = myObj.getLiveObject();
-            alert
-                    .append(tmpObj.getTitle())
-                    .append(" ")
-                    .append((int) distanceCalcViaWidth(tmpObj))
-                    .append("meter ")
-                    .append(getPos(tmpObj))
-                    .append(" ");
-        }
-        textToSpeech.speak(alert.toString());
     }
 
     private void initAlertRunnable() {
@@ -380,7 +347,7 @@ public class ObjectsManager {
         if (objCollection.isEmpty()) {
             Log.i("holdobj", "addObjects: ");
             atomicLiveObjects.put(currentKey, new HashSet<>(currentLiveObjects.stream()
-                    .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.get().getTimeStamp(), TimeUnit.NANOSECONDS) < 6)
+                    .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.get().getTimeStamp(), TimeUnit.NANOSECONDS) < 7)
                     .collect(Collectors.toList())));
             return;
         }
@@ -414,6 +381,7 @@ public class ObjectsManager {
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
+        /*Check what objects need to replace and what new objects to add*/
         Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
         boolean[] keepOld = new boolean[aliveObjects.size()];
         boolean[] addNew = new boolean[list.size()];
@@ -434,6 +402,7 @@ public class ObjectsManager {
             }
         }
 
+        /*Add new objects instead irrelevant old objects*/
         for (int i = 0; i < aliveObjects.size(); i++)
             if (!keepOld[i]) {
                 int j;
@@ -442,7 +411,7 @@ public class ObjectsManager {
                         aliveObjects.set(i, list.get(j));
                         break;
                     }
-
+                /*if inner loop finish full run -> all new objects added*/
                 if (j >= addNew.length)
                     break;
             }

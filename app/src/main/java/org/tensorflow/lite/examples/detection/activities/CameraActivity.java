@@ -61,6 +61,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import org.tensorflow.lite.examples.detection.R;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
+import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
 import org.tensorflow.lite.examples.detection.env.Logger;
@@ -619,7 +620,7 @@ public abstract class CameraActivity extends AppCompatActivity
                                 public void onPreviewSizeChosen(final Size size, final int rotation) {
                                     previewHeight = size.getHeight();
                                     previewWidth = size.getWidth();
-                                    Log.i(Labels_Keys.CANE_THROUGH_LOG, "onPreviewSizeChosen: previewHeight " + previewHeight + " " + previewWidth);
+                                    Log.i(Labels_info.CANE_THROUGH_LOG, "onPreviewSizeChosen: previewHeight " + previewHeight + " " + previewWidth);
                                     CameraActivity.this.onPreviewSizeChosen(size, rotation);
                                 }
                             },
