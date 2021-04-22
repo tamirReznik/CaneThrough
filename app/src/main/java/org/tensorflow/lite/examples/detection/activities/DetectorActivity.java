@@ -129,7 +129,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
     // voice command
     private static final String KWS_SEARCH = "wakeup";
-    private static final String KEYPHRASE = "cane through";
+    private static final String KEYPHRASE = "cane through update";
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
     private SpeechRecognizer recognizer;
     private HashMap<String, Integer> captions;
@@ -285,6 +285,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                         final List<Detector.Recognition> mappedRecognitions = new ArrayList<Detector.Recognition>();
                         HashSet<MyDetectedObject> detectionsSet = new HashSet<>();
+                        boolean objectsAddedToObjectManager = false;
                         for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
@@ -295,14 +296,21 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 mappedRecognitions.add(result);
 
                                 if (objectsManager != null) {
-                                    if (detectionsSet.size() < ObjectManager_SIZE && Labels_info.objectHeight.containsKey(result.getTitle())) {
-                                        MyDetectedObject tmpObj = new MyDetectedObject(result, false, getPos(result));
-                                        detectionsSet.add(tmpObj);
+                                    if (detectionsSet.size() < ObjectManager_SIZE) {
+                                        if (Labels_info.objectHeight.containsKey(result.getTitle())) {
+                                            MyDetectedObject tmpObj = new MyDetectedObject(result, false, getPos(result));
+                                            detectionsSet.add(tmpObj);
+                                        }
+                                    } else if (!objectsAddedToObjectManager) {
+                                        objectsManager.addObjects(detectionsSet);
+                                        objectsAddedToObjectManager = true;
                                     }
-                                    objectsManager.addObjects(detectionsSet);
                                 }
 
                             }
+                        }
+                        if (!objectsAddedToObjectManager) {
+                            objectsManager.addObjects(detectionsSet);
                         }
 
                         tracker.trackResults(mappedRecognitions, currTimestamp);
@@ -383,7 +391,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             Log.i("ptttVoiceCmd", "onResult: wake up voice command");
             ObjectsManager om = ObjectsManager.getInstance();
             if (om != null) {
-                om.initiatedAlert();
+//                om.initiatedAlert();
+                om.alertCalculation(true);
             }
         }
     }

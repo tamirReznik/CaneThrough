@@ -39,9 +39,12 @@ public class ObjectsManager {
     }
 
     public static final int MAX_DISTANCE_LEVEL = 6;
-    public static final int ObjectManager_SIZE = 3;
+    public static final int ObjectManager_SIZE = 6;
     public static final int LANDSCAPE_FRAME_ANGLE_DEGREE = 18;
     public static final int PITCH_FRAME_ANGLE_DEGREE = 4;
+    public static final int MILLISECONDS_ALERT_DELAY = 4000;
+    public static final int ALERT_DELAY_SECONDS = MILLISECONDS_ALERT_DELAY / 1000;
+    public static final int OBJECT_HELD_TIME = ALERT_DELAY_SECONDS * 5;
 
     private static AtomicInteger azimuthIndex, pitchIndex;
     private static ObjectsManager instance;
@@ -178,7 +181,7 @@ public class ObjectsManager {
 
     }
 
-    private void alertCalculation() {
+    public void alertCalculation(boolean initiated) {
         String currentKey = getCurrentKey();
         if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
@@ -186,13 +189,15 @@ public class ObjectsManager {
         }
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
 
-        MyDetectedObject myObj;
+        MyDetectedObject myObj ;
         StringBuilder alert = new StringBuilder();
         for (int i = 0; i < myDetectedObjects.size(); i++) {
             if (myDetectedObjects.get(i) == null)
                 continue;
 
-            if (!(myObj = myDetectedObjects.get(i)).isAlerted()) {
+            myObj = myDetectedObjects.get(i);
+            if (initiated || !myObj.isAlerted()) {
+                assert myObj != null;
                 Detector.Recognition tmpObj = myObj.getLiveObject();
                 alert.append(tmpObj.getTitle()).append(" ").append((int) distanceCalcViaWidth(tmpObj)).append("meter ").append(getPos(tmpObj)).append(" ");
                 myObj.setAlerted(true);
@@ -278,9 +283,9 @@ public class ObjectsManager {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-                alertCalculation();
+                alertCalculation(false);
             }
-        }, 0, 3010);
+        }, 0, MILLISECONDS_ALERT_DELAY);
 
     }
 
@@ -372,8 +377,13 @@ public class ObjectsManager {
         if (currentLiveObjects == null)
             currentLiveObjects = new HashSet<>();
 
-        if (objCollection.isEmpty())
+        if (objCollection.isEmpty()) {
+            Log.i("holdobj", "addObjects: ");
+            atomicLiveObjects.put(currentKey, new HashSet<>(currentLiveObjects.stream()
+                    .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.get().getTimeStamp(), TimeUnit.NANOSECONDS) < 6)
+                    .collect(Collectors.toList())));
             return;
+        }
 
         ArrayList<MyDetectedObject> list = new ArrayList<>(objCollection);
         Log.i("ptttalertequalEB", "addObjects:" + list);
@@ -439,7 +449,7 @@ public class ObjectsManager {
 
         currentLiveObjects.clear();
         currentLiveObjects.addAll(aliveObjects.stream()
-                .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.getTimeStamp(), TimeUnit.NANOSECONDS) < 16)
+                .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.getTimeStamp(), TimeUnit.NANOSECONDS) < OBJECT_HELD_TIME)
                 .map(MyAtomicRef::new).collect(Collectors.toList()));
         atomicLiveObjects.put(currentKey, currentLiveObjects);
     }
