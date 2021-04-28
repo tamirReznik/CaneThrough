@@ -255,7 +255,7 @@ public class ObjectsManager {
         }
 
         // send array to motors
-        if(ESP32.getInstance() != null) {
+        if(ESP32.getInstance() != null && ESP32.getInstance().isConnected()) {
             ESP32.getInstance().sendMessage(generateSignal(obj_to_signal, distance_min));
         }
     }

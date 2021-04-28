@@ -14,16 +14,19 @@ public class ESP32 {
 
     private Arduino arduino;
     private Context context;
+    private boolean connected;
 
     private ESP32(Context context) {
         this.context = context;
         arduino = new Arduino(context);
         arduino.addVendorId(0x1a86);
         arduino.setBaudRate(115200);
+        connected = false;
     }
     public static void init(Context context){
-        if (esp32_instance == null)
+        if (esp32_instance == null) {
             esp32_instance = new ESP32(context);
+        }
     }
     public static ESP32 getInstance()
     {
@@ -56,6 +59,7 @@ public class ESP32 {
 
                 @Override
                 public void onArduinoOpened() {
+                    connected = true;
                     String str = "Welcome ESP32 !";
                     Toast.makeText(context,str,Toast.LENGTH_LONG).show();
                 }
@@ -68,8 +72,14 @@ public class ESP32 {
         }
 
         public void disconnectESP32(){
+        if(connected) {
             arduino.unsetArduinoListener();
             arduino.close();
         }
+        connected =false;
+        }
 
+    public boolean isConnected() {
+        return connected;
+    }
 }
