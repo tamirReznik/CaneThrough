@@ -42,4 +42,16 @@ public interface Labels_info {
         put("bench", 1400f);
         put("mouse", 100f);
     }};
+
+    Map<Integer, Character> distanceLevels = new HashMap<Integer, Character>() {{
+        put(0, 'x');
+        put(1, 'x');
+        put(2, 'y');
+        put(3, 'y');
+        put(4, 'z');
+        put(5, 'z');
+    }};
+
 }
+
+

@@ -67,6 +67,8 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.3.0'
     androidTestImplementation 'androidx.test:rules:1.3.0'
 
+    implementation 'me.aflak.libraries:arduino:1.4.5'
+
 }
 
 ant.importBuild 'assets.xml'

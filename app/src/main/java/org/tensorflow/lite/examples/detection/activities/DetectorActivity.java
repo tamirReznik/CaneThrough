@@ -43,6 +43,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import org.tensorflow.lite.examples.detection.R;
+import org.tensorflow.lite.examples.detection.caneThroughManager.ESP32;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.MyDetectedObject;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
@@ -132,6 +133,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1;
     private SpeechRecognizer recognizer;
 
+
     public void initVoiceCommand() {
 
         int permissionCheck = ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.RECORD_AUDIO);
@@ -147,6 +149,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        ESP32.init(this);
+        ESP32.getInstance().connectToESP32();
         initVoiceCommand();
     }
 
@@ -372,6 +376,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     @Override
     public synchronized void onDestroy() {
         super.onDestroy();
+        ESP32.getInstance().sendMessage("000");
+        ESP32.getInstance().disconnectESP32();
         if (recognizer != null) {
             recognizer.cancel();
             recognizer.shutdown();

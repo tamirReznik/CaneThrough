@@ -202,6 +202,7 @@ public class ObjectsManager {
                 myDetectedObjects.set(i, myObj);
             }
         }
+        updateVibrateMotors();
         textToSpeech.speak(alert.toString());
         atomicLiveObjects.put(currentKey, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
         long currentTime = System.nanoTime();
@@ -215,33 +216,62 @@ public class ObjectsManager {
      * motorsRate[0] -> contains Left object distance from camera - update left motor
      * motorsRate[1] -> contains Center object distance from camera - update Center motor
      * motorsRate[2] -> contains Right object distance from camera - update Right motor
+     * R/C/L for the Vibration motor index
+     * x/y/z for the speed of the vibration
+     * 1/0 on and off
      */
+
+
     private void updateVibrateMotors() {
         String currentKey = getCurrentKey();
         if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
             return;
         }
+
         int[] motorsRate = {MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL};
         int distanceLevel;
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
                 .stream().map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
+        MyDetectedObject obj_to_signal = null;
+        int distance_min = MAX_DISTANCE_LEVEL;
         for (MyDetectedObject obj : myDetectedObjects) {
             distanceLevel = (int) (2 * distanceCalcViaHeight(obj.getLiveObject()));
-
-            if (obj.getPos() == Position.LEFT)
-                motorsRate[0] = Math.min(motorsRate[0], distanceLevel);
-
-            if (obj.getPos() == Position.CENTER)
-                motorsRate[1] = Math.min(motorsRate[0], distanceLevel);
-
-            if (obj.getPos() == Position.RIGHT)
-                motorsRate[2] = Math.min(motorsRate[0], distanceLevel);
+            if(distance_min > distanceLevel){
+                distance_min = distanceLevel;
+                obj_to_signal = obj;
+            }
+//            if (obj.getPos() == Position.LEFT)
+//                motorsRate[0] = Math.min(motorsRate[0], distanceLevel);
+//
+//            if (obj.getPos() == Position.CENTER)
+//                motorsRate[1] = Math.min(motorsRate[0], distanceLevel);
+//
+//            if (obj.getPos() == Position.RIGHT)
+//                motorsRate[2] = Math.min(motorsRate[0], distanceLevel);
 
         }
+
         // send array to motors
+        if(ESP32.getInstance() != null) {
+            ESP32.getInstance().sendMessage(generateSignal(obj_to_signal, distance_min));
+        }
+    }
+
+    private String generateSignal(MyDetectedObject obj, int distance){
+        String signal = "";
+        if(obj.getPos() == Position.LEFT)
+            signal += "L";
+        else if(obj.getPos() == Position.CENTER)
+            signal += "C";
+        else if(obj.getPos() == Position.RIGHT)
+            signal += "R";
+
+        signal += Labels_info.distanceLevels.get(distance);
+        signal += "1";
+        return signal;
     }
 
     private void initAlertRunnable() {
