@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -43,6 +42,13 @@ public class ObjectsManager {
     public static final int MILLISECONDS_ALERT_DELAY = 4000;
     public static final int ALERT_DELAY_SECONDS = MILLISECONDS_ALERT_DELAY / 1000;
     public static final int OBJECT_HELD_TIME = ALERT_DELAY_SECONDS * 5;
+
+    public static final String MOTOR_ON_SIGNAL = "1";
+    public static final String MOTOR_OFF_SIGNAL = "0";
+
+    public static final String LEFT_CHAR = "L";
+    public static final String CENTER_CHAR = "C";
+    public static final String RIGHT_CHAR = "R";
 
     private static AtomicInteger azimuthIndex, pitchIndex;
     private static ObjectsManager instance;
@@ -136,7 +142,6 @@ public class ObjectsManager {
      * @return - Estimated distance in meters
      */
     //addObject method filter object that not exist in Labels_info.objectWidth keys
-    @SuppressWarnings("ConstantConditions")
     private double distanceCalcViaWidth(Detector.Recognition detectedObject) {
 
         float realWidth = Labels_info.objectWidth.get(detectedObject.getTitle());
@@ -160,7 +165,6 @@ public class ObjectsManager {
      * @return - Estimated distance in meters
      */
     //addObject method filter object that not exist in Labels_info.objectHeight keys
-    @SuppressWarnings("ConstantConditions")
     private double distanceCalcViaHeight(Detector.Recognition detectedObject) {
 
 
@@ -213,23 +217,16 @@ public class ObjectsManager {
 
     /**
      * update motors to work according to distance and position
-     * motorsRate[0] -> contains Left object distance from camera - update left motor
-     * motorsRate[1] -> contains Center object distance from camera - update Center motor
-     * motorsRate[2] -> contains Right object distance from camera - update Right motor
      * R/C/L for the Vibration motor index
      * x/y/z for the speed of the vibration
      * 1/0 on and off
      */
-
-
     private void updateVibrateMotors() {
         String currentKey = getCurrentKey();
         if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
             return;
         }
-
-        int[] motorsRate = {MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL, MAX_DISTANCE_LEVEL};
         int distanceLevel;
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
                 .stream().map(AtomicReference::get)
@@ -243,15 +240,6 @@ public class ObjectsManager {
                 distance_min = distanceLevel;
                 obj_to_signal = obj;
             }
-//            if (obj.getPos() == Position.LEFT)
-//                motorsRate[0] = Math.min(motorsRate[0], distanceLevel);
-//
-//            if (obj.getPos() == Position.CENTER)
-//                motorsRate[1] = Math.min(motorsRate[0], distanceLevel);
-//
-//            if (obj.getPos() == Position.RIGHT)
-//                motorsRate[2] = Math.min(motorsRate[0], distanceLevel);
-
         }
 
         // send array to motors
@@ -263,14 +251,14 @@ public class ObjectsManager {
     private String generateSignal(MyDetectedObject obj, int distance){
         String signal = "";
         if(obj.getPos() == Position.LEFT)
-            signal += "L";
+            signal += LEFT_CHAR;
         else if(obj.getPos() == Position.CENTER)
-            signal += "C";
+            signal += CENTER_CHAR;
         else if(obj.getPos() == Position.RIGHT)
-            signal += "R";
+            signal += RIGHT_CHAR;
 
         signal += Labels_info.distanceLevels.get(distance);
-        signal += "1";
+        signal += MOTOR_ON_SIGNAL;
         return signal;
     }
 
@@ -285,86 +273,6 @@ public class ObjectsManager {
         }, 0, MILLISECONDS_ALERT_DELAY);
 
     }
-
-    void playAlert2(List<Detector.Recognition> tmpObjList) {
-
-        if (tmpObjList == null || tmpObjList.isEmpty())
-            return;
-
-        switch (tmpObjList.size()) {
-            case 1:
-                textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
-                Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
-                break;
-            case 2:
-                if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(1).getTitle())) {
-                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
-                            + " And " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
-
-                } else {
-                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
-                            + " And " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
-                }
-                break;
-            case 3:
-                if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(1).getTitle())) {
-                    if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(2).getTitle())) {
-                        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
-                                + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
-                                + " And " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
-                    } else {
-                        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
-                                + " " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
-                                + " And " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2)));
-                    }
-                } else if (tmpObjList.get(0).getTitle().equals(tmpObjList.get(2).getTitle())) {
-                    textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0))
-                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
-                            + " And " + tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1)));
-
-                } else if (tmpObjList.get(1).getTitle().equals(tmpObjList.get(2).getTitle())) {
-                    textToSpeech.speak(tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
-                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
-                            + " And " + tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
-                } else {
-                    textToSpeech.speak(tmpObjList.get(1).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(1)) + "meter " + getPos(tmpObjList.get(1))
-                            + " " + tmpObjList.get(2).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(2)) + "meter " + getPos(tmpObjList.get(2))
-                            + " And " + tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
-                }
-
-
-                break;
-        }
-
-        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
-        Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
-
-        textToSpeech.speak(tmpObjList.get(0).getTitle() + " " + /*distanceCalc(Labels_info.objectHeight.get(tmpObj.getTitle()),
-                tmpObj.getLocation().height())*/distanceCalcViaHeight(tmpObjList.get(0)) + "meter " + getPos(tmpObjList.get(0)));
-        Log.i("ptttalert", "playAlert: " + tmpObjList + " pos: " + getPos(tmpObjList.get(0)) + " center: " + tmpObjList.get(0).getLocation().centerX());
-    }
-
 
     public void addObjects(HashSet<MyDetectedObject> objCollection) {
         String currentKey = getCurrentKey();
