@@ -149,8 +149,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        ESP32.init(this);
-        ESP32.getInstance().connectToESP32();
+
         initVoiceCommand();
     }
 
@@ -376,12 +375,30 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     @Override
     public synchronized void onDestroy() {
         super.onDestroy();
-        ESP32.getInstance().sendMessage("000");
-        ESP32.getInstance().disconnectESP32();
+
+        if (ESP32.getInstance() != null)
+            ESP32.getInstance().disconnectESP32();
+        
         if (recognizer != null) {
             recognizer.cancel();
             recognizer.shutdown();
         }
+    }
+
+    @Override
+    public synchronized void onResume() {
+        super.onResume();
+        if (ESP32.getInstance() == null) {
+            ESP32.init(this);
+            ESP32.getInstance().connectToESP32();
+        }
+    }
+
+    @Override
+    public synchronized void onPause() {
+        super.onPause();
+        if (ESP32.getInstance() != null)
+            ESP32.getInstance().sendMessage("000");
     }
 
     @Override

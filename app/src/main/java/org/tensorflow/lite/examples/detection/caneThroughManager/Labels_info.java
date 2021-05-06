@@ -44,12 +44,12 @@ public interface Labels_info {
     }};
 
     Map<Integer, Character> distanceLevels = new HashMap<Integer, Character>() {{
-        put(0, 'x');
-        put(1, 'x');
+        put(0, 'z');
+        put(1, 'z');
         put(2, 'y');
         put(3, 'y');
-        put(4, 'z');
-        put(5, 'z');
+        put(4, 'x');
+        put(5, 'x');
     }};
 
 }

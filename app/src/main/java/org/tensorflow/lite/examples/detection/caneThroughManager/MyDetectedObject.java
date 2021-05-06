@@ -15,7 +15,6 @@ public class MyDetectedObject {
     private ObjectsManager.Position pos;
 
 
-
     private long timeStamp;
 
     public MyDetectedObject(Detector.Recognition liveObject, boolean alerted, ObjectsManager.Position pos) {
