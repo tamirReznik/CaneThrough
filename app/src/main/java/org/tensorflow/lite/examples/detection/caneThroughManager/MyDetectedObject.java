@@ -14,7 +14,21 @@ public class MyDetectedObject {
     private boolean alerted;
     private ObjectsManager.Position pos;
 
+    public double getCurrentDistance() {
+        return currentDistance;
+    }
 
+    public int getCurrentDistanceLevel() {
+        return (int) (2 * currentDistance);
+    }
+
+    public void setCurrentDistance(double currentDistance) {
+        this.currentDistance = currentDistance;
+    }
+
+    // Do not rely on currentDistance as reliable in real time
+    //Used in some of the functions as reliable data
+    private double currentDistance;
     private long timeStamp;
 
     public MyDetectedObject(Detector.Recognition liveObject, boolean alerted, ObjectsManager.Position pos) {

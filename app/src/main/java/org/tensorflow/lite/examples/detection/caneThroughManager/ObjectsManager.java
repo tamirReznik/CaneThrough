@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -39,8 +40,12 @@ public class ObjectsManager {
     public static final int ObjectManager_SIZE = 6;
     public static final int LANDSCAPE_FRAME_ANGLE_DEGREE = 18;
     public static final int PITCH_FRAME_ANGLE_DEGREE = 4;
+
     public static final int MILLISECONDS_ALERT_DELAY = 4000;
     public static final int ALERT_DELAY_SECONDS = MILLISECONDS_ALERT_DELAY / 1000;
+
+    public static final int MILLISECONDS_ESP32_SIGNAL_DELAY = 500;
+
     public static final int OBJECT_HELD_TIME = ALERT_DELAY_SECONDS * 5;
 
     public static final String MOTOR_ON_SIGNAL = "1";
@@ -53,7 +58,8 @@ public class ObjectsManager {
     private static AtomicInteger azimuthIndex, pitchIndex;
     private static ObjectsManager instance;
     private final Context context;
-    HashMap<String, HashSet<MyAtomicRef>> atomicLiveObjects;
+    private HashMap<String, HashSet<MyAtomicRef>> atomicLiveObjects;
+    private MyDetectedObject objectForVibrateSignal = null;
     private Float focalLength;
     private Float heightSensor, widthSensor;
     private static Float imageHeight, imageWidth;
@@ -192,35 +198,36 @@ public class ObjectsManager {
 
         MyDetectedObject myObj;
         StringBuilder alert = new StringBuilder();
-        double distance = 100f;
+        double distance = 100000f;
         MyDetectedObject ObjToAlertOf = null;
         int index = 0;
         for (int i = 0; i < myDetectedObjects.size(); i++) {
-
             if (myDetectedObjects.get(i) == null)
                 continue;
 
             myObj = myDetectedObjects.get(i);
             if (initiated || !myObj.isAlerted()) {
-                double currentDistance = 0f;
                 assert myObj != null;
                 Detector.Recognition tmpObj = myObj.getLiveObject();
-                if ((currentDistance = distanceCalcViaWidth(tmpObj)) < distance) {
+                double currentDistance = distanceCalcViaWidth(tmpObj);
+                if (currentDistance < distance) {
                     distance = currentDistance;
-                    ObjToAlertOf = new MyDetectedObject(tmpObj,false,getPos(tmpObj));
+                    ObjToAlertOf = new MyDetectedObject(tmpObj, false, getPos(tmpObj));
                     index = i;
                 }
-
-
             }
         }
         if (ObjToAlertOf == null)
             return;
-        alert.append(ObjToAlertOf.getLiveObject().getTitle()).append(" ").append((int) distanceCalcViaWidth(ObjToAlertOf.getLiveObject()))
+        alert.append(ObjToAlertOf.getLiveObject().getTitle()).append(" ").append((int) distance)
                 .append("meter ").append(getPos(ObjToAlertOf.getLiveObject())).append(" ");
         ObjToAlertOf.setAlerted(true);
         myDetectedObjects.set(index, ObjToAlertOf);
-        updateVibrateMotors();
+
+        ObjToAlertOf.setCurrentDistance(distance);
+        objectForVibrateSignal = ObjToAlertOf;
+        ESP32_Signal();
+//        updateVibrateMotors();
         textToSpeech.speak(alert.toString());
         atomicLiveObjects.put(currentKey, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
         long currentTime = System.nanoTime();
@@ -241,24 +248,45 @@ public class ObjectsManager {
             Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
             return;
         }
-        int distanceLevel;
+
         ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
                 .stream().map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
+//        MyDetectedObject obj_to_signal = null;
+//        int distance_min = MAX_DISTANCE_LEVEL, distanceLevel;
+//        for (MyDetectedObject obj : myDetectedObjects) {
+//            distanceLevel = (int) (2 * distanceCalcViaWidth(obj.getLiveObject()));
+//            if (distance_min > distanceLevel) {
+//                distance_min = distanceLevel;
+//                obj_to_signal = obj;
+//            }
+//        }
+
+        // send array to motors
+        objectForVibrateSignal = getMinDistanceObject(myDetectedObjects);
+        if (objectForVibrateSignal != null)
+            ESP32_Signal();
+    }
+
+    private MyDetectedObject getMinDistanceObject(List<MyDetectedObject> myDetectedObjects) {
+        int distance_min = MAX_DISTANCE_LEVEL, distanceLevel;
         MyDetectedObject obj_to_signal = null;
-        int distance_min = MAX_DISTANCE_LEVEL;
+
         for (MyDetectedObject obj : myDetectedObjects) {
-            distanceLevel = (int) (2 * distanceCalcViaHeight(obj.getLiveObject()));
+            distanceLevel = (int) distanceCalcViaWidth(obj.getLiveObject());
             if (distance_min > distanceLevel) {
                 distance_min = distanceLevel;
                 obj_to_signal = obj;
+                obj_to_signal.setCurrentDistance(distance_min);
             }
         }
+        return obj_to_signal;
+    }
 
-        // send array to motors
+    private void ESP32_Signal() {
         if (ESP32.getInstance() != null && ESP32.getInstance().isConnected()) {
-            ESP32.getInstance().sendMessage(generateSignal(obj_to_signal, distance_min));
+            ESP32.getInstance().sendMessage(generateSignal(objectForVibrateSignal, (int) objectForVibrateSignal.getCurrentDistanceLevel()));
         }
     }
 
@@ -288,6 +316,18 @@ public class ObjectsManager {
 
     }
 
+    private void initESP32SignalRunnable() {
+
+        timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+
+            }
+        }, 0, MILLISECONDS_ESP32_SIGNAL_DELAY);
+
+    }
+
     public void addObjects(HashSet<MyDetectedObject> objCollection) {
         String currentKey = getCurrentKey();
         Log.i("ptttAzimuth", "addObjects: " + currentKey);
@@ -304,12 +344,12 @@ public class ObjectsManager {
             return;
         }
 
-        ArrayList<MyDetectedObject> list = new ArrayList<>(objCollection);
-        Log.i("ptttalertequalEB", "addObjects:" + list);
+        ArrayList<MyDetectedObject> objectsList = new ArrayList<>(objCollection);
+        Log.i("ptttalertequalEB", "addObjects:" + objectsList);
 
         if (currentLiveObjects.isEmpty()) {
             Log.i("ptttaddObjects", "isEmpty: ");
-            currentLiveObjects.addAll(list.stream().map(MyAtomicRef::new)
+            currentLiveObjects.addAll(objectsList.stream().map(MyAtomicRef::new)
                     .collect(Collectors.toList()));
             atomicLiveObjects.put(currentKey, currentLiveObjects);
             return;
@@ -317,15 +357,15 @@ public class ObjectsManager {
 
         if (currentLiveObjects.size() < ObjectManager_SIZE) {
 
-            int limit = Math.min(ObjectManager_SIZE - currentLiveObjects.size(), list.size());
+            int limit = Math.min(ObjectManager_SIZE - currentLiveObjects.size(), objectsList.size());
 
             currentLiveObjects
-                    .addAll(list.stream().
+                    .addAll(objectsList.stream().
                             limit(limit)
                             .map(MyAtomicRef::new)
                             .collect(Collectors.toList()));
 
-            list.removeAll(list.subList(0, limit));
+            objectsList.removeAll(objectsList.subList(0, limit));
         }
 
         Log.i("ptttalertequalEA", "addObjects:" + currentLiveObjects);
@@ -333,28 +373,30 @@ public class ObjectsManager {
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
-        /*Check what objects need to replace and what new objects to add*/
-        Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
+        if (aliveObjects.contains(objectForVibrateSignal))
+            objectForVibrateSignal.setCurrentDistance(distanceCalcViaWidth(objectForVibrateSignal.getLiveObject()));
+
+            /*Check what objects need to replace and what new objects to add*/
+            Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
         boolean[] keepOld = new boolean[aliveObjects.size()];
-        boolean[] addNew = new boolean[list.size()];
+        boolean[] addNew = new boolean[objectsList.size()];
         Arrays.fill(addNew, Boolean.TRUE);
         MyDetectedObject aliveObj, newObj;
         double diff = 10;
         for (int i = 0; i < aliveObjects.size(); i++) {
             aliveObj = aliveObjects.get(i);
 
-            for (int j = 0; j < list.size(); j++) {
-                newObj = list.get(j);
-
+            for (int j = 0; j < objectsList.size(); j++) {
+                newObj = objectsList.get(j);
 
                 if (aliveObj.hashCode() == newObj.hashCode())
                     if (aliveObj.getPos() != newObj.getPos())
                         if (aliveObj.getPos() == ObjectsManager.Position.CENTER || newObj.getPos() == ObjectsManager.Position.CENTER) {
                             diff = aliveObj.getLiveObject().getLocation().centerX() - newObj.getLiveObject().getLocation().centerX();
-
                         }
+
                 if (aliveObj.equals(newObj) || Math.abs(diff) < 25) {
-                    newObj.setAlerted(true);
+//                    newObj.setAlerted(true);
                     aliveObjects.set(i, newObj);
                     keepOld[i] = true;
                     addNew[j] = false;
@@ -368,7 +410,7 @@ public class ObjectsManager {
                 int j;
                 for (j = 0; j < addNew.length; j++)
                     if (addNew[j]) {
-                        aliveObjects.set(i, list.get(j));
+                        aliveObjects.set(i, objectsList.get(j));
                         break;
                     }
                 /*if inner loop finish full run -> all new objects added*/
