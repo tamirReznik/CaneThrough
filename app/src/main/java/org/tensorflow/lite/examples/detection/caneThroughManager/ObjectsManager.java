@@ -285,8 +285,8 @@ public class ObjectsManager {
     }
 
     private void ESP32_Signal() {
-        if (ESP32.getInstance() != null && ESP32.getInstance().isConnected()) {
-            ESP32.getInstance().sendMessage(generateSignal(objectForVibrateSignal, (int) objectForVibrateSignal.getCurrentDistanceLevel()));
+        if (ESP32.getInstance() != null && ESP32.getInstance().isConnected() && objectForVibrateSignal != null) {
+            ESP32.getInstance().sendMessage(generateSignal(objectForVibrateSignal, objectForVibrateSignal.getCurrentDistanceLevel()));
         }
     }
 
@@ -322,7 +322,7 @@ public class ObjectsManager {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
-
+                ESP32_Signal();
             }
         }, 0, MILLISECONDS_ESP32_SIGNAL_DELAY);
 
@@ -376,8 +376,8 @@ public class ObjectsManager {
         if (aliveObjects.contains(objectForVibrateSignal))
             objectForVibrateSignal.setCurrentDistance(distanceCalcViaWidth(objectForVibrateSignal.getLiveObject()));
 
-            /*Check what objects need to replace and what new objects to add*/
-            Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
+        /*Check what objects need to replace and what new objects to add*/
+        Log.i("ptttaddObjects", "addObjects: bef atomiclist" + aliveObjects.toString());
         boolean[] keepOld = new boolean[aliveObjects.size()];
         boolean[] addNew = new boolean[objectsList.size()];
         Arrays.fill(addNew, Boolean.TRUE);
