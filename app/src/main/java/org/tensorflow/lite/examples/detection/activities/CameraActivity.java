@@ -55,12 +55,10 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
-import androidx.appcompat.widget.Toolbar;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
 import org.tensorflow.lite.examples.detection.R;
-import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.caneThroughManager.ObjectsManager;
 import org.tensorflow.lite.examples.detection.env.ImageUtils;
@@ -68,7 +66,6 @@ import org.tensorflow.lite.examples.detection.env.Logger;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Objects;
 
 public abstract class CameraActivity extends AppCompatActivity
         implements OnImageAvailableListener,
@@ -139,7 +136,7 @@ public abstract class CameraActivity extends AppCompatActivity
         //CaneThrough
         initProximityScreenLock();
         InitSensors();
-        //#
+
 
         if (hasPermission()) {
             setFragment();

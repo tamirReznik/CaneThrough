@@ -62,7 +62,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.tensorflow.lite.examples.detection.R;
-import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_Keys;
 import org.tensorflow.lite.examples.detection.caneThroughManager.Labels_info;
 import org.tensorflow.lite.examples.detection.customview.AutoFitTextureView;
 import org.tensorflow.lite.examples.detection.env.Logger;

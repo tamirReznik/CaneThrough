@@ -78,6 +78,8 @@ public class ObjectsManager {
 
         initVoiceAlerts();
 
+        initESP32SignalRunnable();
+
         initCameraParam(cameraId);
 
         Log.i("CT_log", "ObjectsManager: focal" + focalLength + " height sensor: " + heightSensor + " width sensor: " + widthSensor);
@@ -227,7 +229,6 @@ public class ObjectsManager {
         ObjToAlertOf.setCurrentDistance(distance);
         objectForVibrateSignal = ObjToAlertOf;
         ESP32_Signal();
-//        updateVibrateMotors();
         textToSpeech.speak(alert.toString());
         atomicLiveObjects.put(currentKey, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
         long currentTime = System.nanoTime();
@@ -242,47 +243,47 @@ public class ObjectsManager {
      * x/y/z for the speed of the vibration
      * 1/0 on and off
      */
-    private void updateVibrateMotors() {
-        String currentKey = getCurrentKey();
-        if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
-            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
-            return;
-        }
+//    private void updateVibrateMotors() {
+//        String currentKey = getCurrentKey();
+//        if (atomicLiveObjects.get(currentKey) == null || Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
+//            Log.i("ptttTime", "exit: " + atomicLiveObjects.toString());
+//            return;
+//        }
+//
+//        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
+//                .stream().map(AtomicReference::get)
+//                .collect(Collectors.toCollection(ArrayList::new));
+//
+////        MyDetectedObject obj_to_signal = null;
+////        int distance_min = MAX_DISTANCE_LEVEL, distanceLevel;
+////        for (MyDetectedObject obj : myDetectedObjects) {
+////            distanceLevel = (int) (2 * distanceCalcViaWidth(obj.getLiveObject()));
+////            if (distance_min > distanceLevel) {
+////                distance_min = distanceLevel;
+////                obj_to_signal = obj;
+////            }
+////        }
+//
+//        // send array to motors
+//        objectForVibrateSignal = getMinDistanceObject(myDetectedObjects);
+//        if (objectForVibrateSignal != null)
+//            ESP32_Signal();
+//    }
 
-        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
-                .stream().map(AtomicReference::get)
-                .collect(Collectors.toCollection(ArrayList::new));
-
-//        MyDetectedObject obj_to_signal = null;
+//    private MyDetectedObject getMinDistanceObject(List<MyDetectedObject> myDetectedObjects) {
 //        int distance_min = MAX_DISTANCE_LEVEL, distanceLevel;
+//        MyDetectedObject obj_to_signal = null;
+//
 //        for (MyDetectedObject obj : myDetectedObjects) {
-//            distanceLevel = (int) (2 * distanceCalcViaWidth(obj.getLiveObject()));
+//            distanceLevel = (int) distanceCalcViaWidth(obj.getLiveObject());
 //            if (distance_min > distanceLevel) {
 //                distance_min = distanceLevel;
 //                obj_to_signal = obj;
+//                obj_to_signal.setCurrentDistance(distance_min);
 //            }
 //        }
-
-        // send array to motors
-        objectForVibrateSignal = getMinDistanceObject(myDetectedObjects);
-        if (objectForVibrateSignal != null)
-            ESP32_Signal();
-    }
-
-    private MyDetectedObject getMinDistanceObject(List<MyDetectedObject> myDetectedObjects) {
-        int distance_min = MAX_DISTANCE_LEVEL, distanceLevel;
-        MyDetectedObject obj_to_signal = null;
-
-        for (MyDetectedObject obj : myDetectedObjects) {
-            distanceLevel = (int) distanceCalcViaWidth(obj.getLiveObject());
-            if (distance_min > distanceLevel) {
-                distance_min = distanceLevel;
-                obj_to_signal = obj;
-                obj_to_signal.setCurrentDistance(distance_min);
-            }
-        }
-        return obj_to_signal;
-    }
+//        return obj_to_signal;
+//    }
 
     private void ESP32_Signal() {
         if (ESP32.getInstance() != null && ESP32.getInstance().isConnected() && objectForVibrateSignal != null) {
@@ -349,7 +350,9 @@ public class ObjectsManager {
 
         if (currentLiveObjects.isEmpty()) {
             Log.i("ptttaddObjects", "isEmpty: ");
-            currentLiveObjects.addAll(objectsList.stream().map(MyAtomicRef::new)
+            currentLiveObjects.addAll(objectsList
+                    .stream()
+                    .map(MyAtomicRef::new)
                     .collect(Collectors.toList()));
             atomicLiveObjects.put(currentKey, currentLiveObjects);
             return;

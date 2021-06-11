@@ -66,6 +66,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import edu.cmu.pocketsphinx.Assets;
 import edu.cmu.pocketsphinx.Hypothesis;
@@ -264,7 +265,11 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                         LOGGER.i("Running detection on image " + currTimestamp);
                         final long startTime = SystemClock.uptimeMillis();
-                        final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
+                        final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap)
+                                .stream()
+                                .filter(obj -> obj.getConfidence() >= MINIMUM_CONFIDENCE_TF_OD_API)
+                                .filter(obj -> Labels_info.objectWidth.containsKey(obj.getTitle()))
+                                .collect(Collectors.toList());
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
                         cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
@@ -295,10 +300,8 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
                                 if (objectsManager != null) {
                                     if (detectionsSet.size() < ObjectManager_SIZE) {
-                                        if (Labels_info.objectHeight.containsKey(result.getTitle())) {
-                                            MyDetectedObject tmpObj = new MyDetectedObject(result, false, objectsManager.getPos(result));
-                                            detectionsSet.add(tmpObj);
-                                        }
+                                        MyDetectedObject tmpObj = new MyDetectedObject(result, false, objectsManager.getPos(result));
+                                        detectionsSet.add(tmpObj);
                                     } else if (!objectsAddedToObjectManager) {
                                         objectsManager.addObjects(detectionsSet);
                                         objectsAddedToObjectManager = true;
@@ -378,7 +381,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
         if (ESP32.getInstance() != null)
             ESP32.getInstance().disconnectESP32();
-        
+
         if (recognizer != null) {
             recognizer.cancel();
             recognizer.shutdown();
