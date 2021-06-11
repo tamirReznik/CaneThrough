@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -284,10 +283,15 @@ public class ObjectsManager {
 //        }
 //        return obj_to_signal;
 //    }
-
     private void ESP32_Signal() {
         if (ESP32.getInstance() != null && ESP32.getInstance().isConnected() && objectForVibrateSignal != null) {
             ESP32.getInstance().sendMessage(generateSignal(objectForVibrateSignal, objectForVibrateSignal.getCurrentDistanceLevel()));
+        }
+    }
+
+    private void ESP32_Silent() {
+        if (ESP32.getInstance() != null && ESP32.getInstance().isConnected()) {
+            ESP32.getInstance().sendMessage("000");
         }
     }
 
@@ -342,6 +346,10 @@ public class ObjectsManager {
             atomicLiveObjects.put(currentKey, new HashSet<>(currentLiveObjects.stream()
                     .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.get().getTimeStamp(), TimeUnit.NANOSECONDS) < 1)
                     .collect(Collectors.toList())));
+
+            if (atomicLiveObjects.isEmpty())
+                ESP32_Silent();
+
             return;
         }
 
