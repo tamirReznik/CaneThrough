@@ -35,6 +35,7 @@ public class MyDetectedObject {
         this.liveObject = liveObject;
         this.alerted = alerted;
         this.pos = pos;
+
         timeStamp = System.nanoTime();
     }
 

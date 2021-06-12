@@ -77,7 +77,7 @@ public class ObjectsManager {
 
         initVoiceAlerts();
 
-        initESP32SignalRunnable();
+      //  initESP32SignalRunnable();
 
         initCameraParam(cameraId);
 
@@ -195,8 +195,12 @@ public class ObjectsManager {
             return;
         }
 
-        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey)).stream().map(AtomicReference::get).collect(Collectors.toCollection(ArrayList::new));
+        ArrayList<MyDetectedObject> myDetectedObjects = Objects.requireNonNull(atomicLiveObjects.get(currentKey))
+                .stream()
+                .map(AtomicReference::get)
+                .collect(Collectors.toCollection(ArrayList::new));
 
+        boolean signalFlag = false;
         MyDetectedObject myObj;
         StringBuilder alert = new StringBuilder();
         double distance = 100000f;
@@ -220,7 +224,8 @@ public class ObjectsManager {
                 if (objectForVibrateSignal.equals(myObj)
                         && Math.abs(objectForVibrateSignal.getCurrentDistance() - myObj.getCurrentDistance()) > 0.5) {
                     objectForVibrateSignal.setCurrentDistance(myObj.getCurrentDistance());
-
+                    ESP32_Signal();
+                    signalFlag = true;
                 }
             }
         }
@@ -234,9 +239,12 @@ public class ObjectsManager {
             objectForVibrateSignal = ObjToAlertOf;
             textToSpeech.speak(alert.toString());
             atomicLiveObjects.put(currentKey, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
+            if(!signalFlag)
+                ESP32_Signal();
+            
         }
-        
-        ESP32_Signal();
+
+
 
         long currentTime = System.nanoTime();
         long elapsedTime = currentTime - lastAlert;
