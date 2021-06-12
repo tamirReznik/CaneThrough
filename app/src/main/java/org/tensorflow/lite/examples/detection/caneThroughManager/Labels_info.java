@@ -36,7 +36,7 @@ public interface Labels_info {
         put("person", 380f);
         put("person ", 180f);
         put("dining table", 1050f);
-        put("suitcase",400f);
+        //put("suitcase",400f);
         put("handbag",400f);
         put("backpack",350f);
         put("chair", 400f);
