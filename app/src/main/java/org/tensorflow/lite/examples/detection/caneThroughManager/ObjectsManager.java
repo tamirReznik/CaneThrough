@@ -45,7 +45,7 @@ public class ObjectsManager {
 
     public static final int MILLISECONDS_ESP32_SIGNAL_DELAY = 500;
 
-    public static final int OBJECT_HELD_TIME = ALERT_DELAY_SECONDS * 5;
+    public static final int OBJECT_HELD_TIME = ALERT_DELAY_SECONDS * 8;
 
     public static final String MOTOR_ON_SIGNAL = "1";
     public static final String MOTOR_OFF_SIGNAL = "0";
@@ -77,7 +77,7 @@ public class ObjectsManager {
 
         initVoiceAlerts();
 
-      //  initESP32SignalRunnable();
+        //  initESP32SignalRunnable();
 
         initCameraParam(cameraId);
 
@@ -217,7 +217,7 @@ public class ObjectsManager {
                 double currentDistance = distanceCalcViaWidth(tmpObj);
                 if (currentDistance < distance) {
                     distance = currentDistance;
-                    ObjToAlertOf = new MyDetectedObject(tmpObj, false, getPos(tmpObj));
+                    ObjToAlertOf = myObj;
                     index = i;
                 }
             } else if (myObj.isAlerted() && objectForVibrateSignal != null) {
@@ -239,16 +239,15 @@ public class ObjectsManager {
             objectForVibrateSignal = ObjToAlertOf;
             textToSpeech.speak(alert.toString());
             atomicLiveObjects.put(currentKey, new HashSet<>(myDetectedObjects.stream().map(MyAtomicRef::new).collect(Collectors.toList())));
-            if(!signalFlag)
+            if (!signalFlag)
                 ESP32_Signal();
-            
+
         }
 
 
-
-        long currentTime = System.nanoTime();
+        long currentTime = System.currentTimeMillis();
         long elapsedTime = currentTime - lastAlert;
-        Log.i("ptttTime", "run: " + TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.NANOSECONDS));
+        Log.i("ptttTime", "run: " + TimeUnit.SECONDS.convert(elapsedTime, TimeUnit.MILLISECONDS));
         lastAlert = currentTime;
     }
 
@@ -358,15 +357,23 @@ public class ObjectsManager {
             currentLiveObjects = new HashSet<>();
 
         if (objCollection.isEmpty()) {
-            long currentTimestamp = System.nanoTime();
-            Log.i("holdobj", "addObjects: ");
-            atomicLiveObjects.put(currentKey, new HashSet<>(currentLiveObjects.stream()
-                    .filter(obj -> TimeUnit.SECONDS.convert(currentTimestamp - obj.get().getTimeStamp(), TimeUnit.NANOSECONDS) < 1)
-                    .collect(Collectors.toList())));
 
-            if (Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty()) {
+            long currentTimestamp = System.currentTimeMillis();
+
+            atomicLiveObjects.put(currentKey, new HashSet<>(currentLiveObjects.stream()
+                    .filter(obj -> TimeUnit.SECONDS.convert(currentTimestamp - obj.get().getTimeStamp(), TimeUnit.MILLISECONDS) < 25)
+                    .collect(Collectors.toList())));
+//            ArrayList<MyAtomicRef> tmpArray = new ArrayList(currentLiveObjects);
+//            for (MyAtomicRef tmpAtom : currentLiveObjects) {
+//                long tmpLong = currentTimestamp - tmpAtom.get().getTimeStamp();
+//                Log.i("timestamptag", "diff: " + TimeUnit.SECONDS.convert(tmpLong,TimeUnit.MILLISECONDS));
+//                Log.i("timestamptag", "current: " + currentTimestamp);
+//                Log.i("timestamptag", "live: " + tmpAtom.get().getTimeStamp());
+//                Log.i("timestamptag", "object: " + tmpAtom.get());
+//            }
+
+            if (Objects.requireNonNull(atomicLiveObjects.get(currentKey)).isEmpty())
                 ESP32_Silent();
-            }
 
             return;
         }
@@ -398,7 +405,8 @@ public class ObjectsManager {
         }
 
         Log.i("ptttalertequalEA", "addObjects:" + currentLiveObjects);
-        ArrayList<MyDetectedObject> aliveObjects = currentLiveObjects.stream()
+        ArrayList<MyDetectedObject> aliveObjects = currentLiveObjects
+                .stream()
                 .map(AtomicReference::get)
                 .collect(Collectors.toCollection(ArrayList::new));
 
@@ -424,8 +432,11 @@ public class ObjectsManager {
                             diff = aliveObj.getLiveObject().getLocation().centerX() - newObj.getLiveObject().getLocation().centerX();
                         }
 
-                if (aliveObj.equals(newObj) || Math.abs(diff) < 25) {
-//                    newObj.setAlerted(true);
+
+                if (aliveObj.equals(newObj) || Math.abs(diff) < 30) {
+
+                    newObj.setAlerted(aliveObj.isAlerted());
+                    newObj.setTimeStamp(aliveObj.getTimeStamp());
                     aliveObjects.set(i, newObj);
                     keepOld[i] = true;
                     addNew[j] = false;
@@ -449,7 +460,7 @@ public class ObjectsManager {
 
         currentLiveObjects.clear();
         currentLiveObjects.addAll(aliveObjects.stream()
-                .filter(obj -> TimeUnit.SECONDS.convert(System.nanoTime() - obj.getTimeStamp(), TimeUnit.NANOSECONDS) < OBJECT_HELD_TIME)
+                .filter(obj -> TimeUnit.SECONDS.convert(System.currentTimeMillis() - obj.getTimeStamp(), TimeUnit.MILLISECONDS) < OBJECT_HELD_TIME)
                 .map(MyAtomicRef::new).collect(Collectors.toList()));
         atomicLiveObjects.put(currentKey, currentLiveObjects);
     }

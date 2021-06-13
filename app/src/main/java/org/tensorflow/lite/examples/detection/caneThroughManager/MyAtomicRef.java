@@ -10,6 +10,7 @@ public class MyAtomicRef extends AtomicReference<MyDetectedObject> {
 
     public MyAtomicRef(MyDetectedObject initialValue) {
         super(initialValue);
+
     }
 
     @Override

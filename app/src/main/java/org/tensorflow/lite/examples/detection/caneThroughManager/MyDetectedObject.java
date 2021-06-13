@@ -29,6 +29,11 @@ public class MyDetectedObject {
     // Do not rely on currentDistance as reliable in real time
     //Used in some of the functions as reliable data
     private double currentDistance;
+
+    public void setTimeStamp(long timeStamp) {
+        this.timeStamp = timeStamp;
+    }
+
     private long timeStamp;
 
     public MyDetectedObject(Detector.Recognition liveObject, boolean alerted, ObjectsManager.Position pos) {
@@ -36,7 +41,14 @@ public class MyDetectedObject {
         this.alerted = alerted;
         this.pos = pos;
 
-        timeStamp = System.nanoTime();
+        timeStamp = System.currentTimeMillis();
+    }
+    public MyDetectedObject(MyDetectedObject myDetectedObject) {
+        this.liveObject = myDetectedObject.getLiveObject();
+        this.alerted = myDetectedObject.isAlerted();
+        this.pos = myDetectedObject.getPos();
+
+        timeStamp = myDetectedObject.getTimeStamp();
     }
 
     public ObjectsManager.Position getPos() {
